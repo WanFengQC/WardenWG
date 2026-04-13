@@ -1,0 +1,18 @@
+proxies:
+{% for peer in peers %}
+  - name: "{{ peer.node.display_name }}"
+    type: wireguard
+    server: {{ peer.node.wg_endpoint_host }}
+    port: {{ peer.node.wg_port }}
+    ip: {{ peer.client_address.split('/')[0] }}
+    private-key: {{ peer.private_key }}
+    public-key: {{ peer.node.wg_public_key }}
+    udp: true
+    mtu: {{ wg_interface_mtu }}
+    persistent-keepalive: {{ wg_persistent_keepalive }}
+    remote-dns-resolve: true
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+{% endfor %}
+

@@ -1,0 +1,79 @@
+mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: info
+ipv6: false
+external-controller: 127.0.0.1:9090
+
+profile:
+  store-selected: true
+  store-fake-ip: true
+
+proxy-providers:
+  wardenwg-nodes:
+    type: http
+    url: {{ nodes_url }}
+    path: ./providers/wardenwg-nodes.yaml
+    interval: 3600
+    health-check:
+      enable: true
+      url: https://cp.cloudflare.com/generate_204
+      interval: 300
+
+proxy-groups:
+  - name: PROXY
+    type: select
+    use:
+      - wardenwg-nodes
+  - name: AUTO
+    type: url-test
+    use:
+      - wardenwg-nodes
+    url: https://cp.cloudflare.com/generate_204
+    interval: 300
+    tolerance: 100
+  - name: ADS
+    type: select
+    proxies:
+      - REJECT
+      - DIRECT
+  - name: FINAL
+    type: select
+    proxies:
+      - PROXY
+      - AUTO
+      - DIRECT
+
+rule-providers:
+  private:
+    type: http
+    behavior: classical
+    url: {{ ruleset_base_url }}/private.yaml
+    path: ./ruleset/private.yaml
+    interval: 86400
+  cn:
+    type: http
+    behavior: classical
+    url: {{ ruleset_base_url }}/cn.yaml
+    path: ./ruleset/cn.yaml
+    interval: 86400
+  geolocation-not-cn:
+    type: http
+    behavior: classical
+    url: {{ ruleset_base_url }}/geolocation-!cn.yaml
+    path: ./ruleset/geolocation-!cn.yaml
+    interval: 86400
+  ads:
+    type: http
+    behavior: classical
+    url: {{ ruleset_base_url }}/category-ads-all.yaml
+    path: ./ruleset/category-ads-all.yaml
+    interval: 86400
+
+rules:
+  - RULE-SET,private,DIRECT
+  - RULE-SET,cn,DIRECT
+  - RULE-SET,ads,ADS
+  - RULE-SET,geolocation-not-cn,PROXY
+  - MATCH,FINAL
+
