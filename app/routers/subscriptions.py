@@ -1,5 +1,4 @@
 from urllib.parse import quote
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from sqlalchemy.orm import Session
@@ -49,15 +48,7 @@ def _build_subscription_headers(device, filename: str) -> dict[str, str]:
     upload = sum(peer.transfer_tx_total for peer in device.peers)
     download = sum(peer.transfer_rx_total for peer in device.peers)
     total = device.user.total_quota_bytes if device.user.total_quota_bytes is not None else download + upload
-    expire = 0
-    if device.user.expires_at:
-        tz = ZoneInfo(settings.timezone)
-        expires_at = device.user.expires_at
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=tz)
-        else:
-            expires_at = expires_at.astimezone(tz)
-        expire = int(expires_at.timestamp())
+    expire = int(device.user.expires_at.timestamp()) if device.user.expires_at else 0
     display_name = settings.subscription_display_name.strip() or "WFQC8"
     encoded_filename = quote(filename)
     return {
