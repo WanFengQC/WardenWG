@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}管理后台{% endblock %}
+{% block content %}
+<div class="hero">
+  <div>
+    <h1>WardenWG 管理后台</h1>
+    <p>管理用户、订阅、节点同步和流量采集。当前时间：{{ now.strftime("%Y-%m-%d %H:%M:%S") }}</p>
+  </div>
+  <div class="toolbar">
+    <form method="post" action="/admin/tasks/collect-traffic"><button class="alt" type="submit">立即采集流量</button></form>
+    <form method="post" action="/admin/tasks/sync-peers"><button class="warn" type="submit">同步全部 Peer</button></form>
+    <form method="post" action="/admin/logout"><button class="danger" type="submit">退出登录</button></form>
+  </div>
+</div>
+
+<div class="grid cards">
+  <section class="panel"><div class="muted">总用户数</div><div class="card-number">{{ total_users }}</div></section>
+  <section class="panel"><div class="muted">启用用户</div><div class="card-number">{{ active_users }}</div></section>
+  <section class="panel"><div class="muted">节点数</div><div class="card-number">{{ nodes|length }}</div></section>
+  <section class="panel"><div class="muted">累计流量</div><div class="card-number">{{ total_used|filesize }}</div></section>
+</div>
+
+{% if error %}
+<section class="panel" style="margin-top: 18px;">
+  <div class="notice">{{ error }}</div>
+</section>
+{% endif %}
+
+<div class="split" style="margin-top: 18px;">
+  <section class="panel">
+    <h2>创建用户</h2>
+    <form method="post" action="/admin/users" class="grid">
+      <label><div>用户名</div><input name="username" required placeholder="例如 test002"></label>
+      <label><div>到期时间</div><input type="datetime-local" name="expires_at"></label>
+      <label><div>总流量配额（GB）</div><input name="total_quota_gb" placeholder="留空表示不限额"></label>
+      <label><div>备注</div><textarea name="remark" placeholder="例如 月付测试用户"></textarea></label>
+      <button type="submit">创建并生成三节点 Peer</button>
+    </form>
+  </section>
+  <section class="panel">
+    <h2>节点概览</h2>
+    <table>
+      <thead><tr><th>节点</th><th>公网出口</th><th>WG 网络</th><th>SSH</th></tr></thead>
+      <tbody>
+      {% for node in nodes %}
+      <tr>
+        <td>{{ node.display_name }}</td>
+        <td>{{ node.public_ip }}:{{ node.wg_port }}</td>
+        <td>{{ node.wg_network }}</td>
+        <td>{{ node.ssh_host }}:{{ node.ssh_port }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<section class="panel" style="margin-top: 18px;">
+  <h2>用户列表</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>用户名</th>
+        <th>状态</th>
+        <th>已用流量</th>
+        <th>订阅入口</th>
+        <th>Peer</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for user in users %}
+      <tr>
+        <td>{{ user.id }}</td>
+        <td>
+          <strong>{{ user.username }}</strong><br>
+          <span class="muted">{{ user.remark or "-" }}</span>
+        </td>
+        <td>
+          <span class="status{% if not user.is_active %} off{% endif %}">
+            {{ "启用" if user.is_active else "禁用" }}
+          </span>
+        </td>
+        <td>{{ user.used_bytes|filesize }}</td>
+        <td class="mono">
+          {{ subscription_base_url }}/sub/{{ user.subscription_token }}/main.yaml
+        </td>
+        <td class="mono">
+          {% for peer in user.peers %}
+            {{ peer.node.name }} → {{ peer.client_address }}<br>
+          {% endfor %}
+        </td>
+        <td>
+          <div class="inline-actions">
+            <form method="post" action="/admin/users/{{ user.id }}/toggle">
+              <button class="alt" type="submit">{{ "禁用" if user.is_active else "启用" }}</button>
+            </form>
+            <form method="post" action="/admin/users/{{ user.id }}/rotate-token">
+              <button class="warn" type="submit">轮换订阅</button>
+            </form>
+            <a class="button alt" href="/portal?token={{ user.subscription_token }}">用户前台</a>
+          </div>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

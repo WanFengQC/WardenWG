@@ -1,167 +1,30 @@
 # WardenWG
 
-WardenWG 是一个轻量的 WireGuard 管理面 MVP。它不承接用户 VPN 数据面，只做用户管理、订阅生成、peer 同步和基于 `wg show dump` 的流量采集。
+WardenWG 是一个面向 WireGuard 原生节点的轻量管理面 MVP。它不承接 VPN 数据转发，只负责用户管理、订阅下发、Peer 同步、流量采集和基础页面展示。
 
-## 1. 总体架构设计
+## 1. 入口
 
-### 1.1 模块划分
+- 管理 API：`/api/v1/*`
+- 订阅接口：`/sub/{token}/main.yaml`、`/sub/{token}/nodes.yaml`
+- 管理后台：`/admin/login`
+- 用户前台：`/portal/login`
 
-- `app/main.py`：FastAPI 入口与生命周期管理
-- `app/models/`：用户、节点、peer、流量快照、日汇总、订阅访问日志
-- `app/services/users.py`：创建用户、生成三节点 peer、订阅状态校验
-- `app/services/subscription.py`：渲染 `main.yaml` 和 `nodes.yaml`
-- `app/services/node_sync.py`：将 peer 配置同步到各节点
-- `app/services/traffic.py`：解析 `wg show wg0 dump` 并写入快照与日汇总
-- `app/routers/`：管理 API 与订阅 API
-- `app/tasks/scheduler.py`：APScheduler 定时采集
-- `scripts/seed_nodes.py`：初始化 3 个现有节点
+如果已经通过 NPM 反代 `sub.wfqc8.cn`，则网页入口可以直接使用：
 
-### 1.2 数据流
+- `https://sub.wfqc8.cn/admin/login`
+- `https://sub.wfqc8.cn/portal/login`
 
-1. 管理员通过 API 创建用户。
-2. 系统为每个用户在 206/100/101 三个节点上各生成 1 个 WireGuard peer。
-3. 用户只拿一个订阅入口：`/sub/<token>/main.yaml`。
-4. `main.yaml` 引用 `/sub/<token>/nodes.yaml`，其中包含 3 个 `type: wireguard` 节点。
-5. 客户端流量直接进入原生 WireGuard 节点，不经过 WardenWG。
-6. 管理面定时通过 SSH 执行 `wg show wg0 dump`，只采集控制信息和计数器。
-7. 采集结果写入 `peer_traffic_snapshots`，并累加到 `daily_traffic_summaries`。
+## 2. MVP 能力
 
-### 1.3 为什么不会明显拖慢 VPN 性能
+- 创建用户时自动生成三台节点的 WireGuard Peer
+- 为每个用户生成独立订阅 token
+- 输出 Mihomo / Clash.Meta 可直接导入的 `main.yaml` 和 `nodes.yaml`
+- 通过 SSH 到各节点执行 `wg show wg0 dump` 采集 Peer 计数器
+- 按用户、按节点、按日汇总流量
+- 管理后台支持创建用户、启停用户、轮换 token、触发流量采集、触发 Peer 同步
+- 用户前台支持查看订阅链接、节点信息和流量统计
 
-- 订阅下发和流量统计都在管理面完成，不在转发路径。
-- VPN 数据仍然是客户端直连 3 台 WireGuard 节点。
-- 统计只读取 WireGuard peer 计数器，不做统一入口、不做中转代理、不做额外封装。
-- 定时采集频率默认 5 分钟一次，对节点的负载远低于中转代理方案。
-
-## 2. 数据库表结构
-
-### 2.1 `users`
-
-```sql
-CREATE TABLE users (
-  id INTEGER PRIMARY KEY,
-  username VARCHAR(64) UNIQUE NOT NULL,
-  subscription_token VARCHAR(128) UNIQUE NOT NULL,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  expires_at TIMESTAMP NULL,
-  total_quota_bytes BIGINT NULL,
-  used_bytes BIGINT NOT NULL DEFAULT 0,
-  remark TEXT NULL,
-  created_at TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP NOT NULL
-);
-CREATE INDEX ix_users_username ON users(username);
-CREATE INDEX ix_users_subscription_token ON users(subscription_token);
-CREATE INDEX ix_users_is_active ON users(is_active);
-```
-
-### 2.2 `nodes`
-
-```sql
-CREATE TABLE nodes (
-  id INTEGER PRIMARY KEY,
-  name VARCHAR(64) UNIQUE NOT NULL,
-  display_name VARCHAR(128) NOT NULL,
-  public_ip VARCHAR(64) UNIQUE NOT NULL,
-  private_ip VARCHAR(64) NULL,
-  ssh_port INTEGER NOT NULL DEFAULT 5522,
-  ssh_host VARCHAR(128) NOT NULL,
-  wg_endpoint_host VARCHAR(128) NOT NULL,
-  wg_port INTEGER NOT NULL,
-  wg_public_key VARCHAR(128) NOT NULL,
-  wg_network VARCHAR(32) NOT NULL,
-  reserved_host_octet INTEGER NOT NULL DEFAULT 10,
-  sort_order INTEGER NOT NULL DEFAULT 100,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP NOT NULL
-);
-```
-
-### 2.3 `peers`
-
-```sql
-CREATE TABLE peers (
-  id INTEGER PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  node_id INTEGER NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-  name VARCHAR(128) NOT NULL,
-  client_address VARCHAR(32) NOT NULL,
-  private_key VARCHAR(128) NOT NULL,
-  public_key VARCHAR(128) NOT NULL,
-  preshared_key VARCHAR(128) NULL,
-  allowed_ips VARCHAR(128) NOT NULL DEFAULT '0.0.0.0/0, ::/0',
-  persistent_keepalive INTEGER NOT NULL DEFAULT 25,
-  latest_handshake_at TIMESTAMP NULL,
-  transfer_rx_total BIGINT NOT NULL DEFAULT 0,
-  transfer_tx_total BIGINT NOT NULL DEFAULT 0,
-  last_synced_at TIMESTAMP NULL,
-  created_at TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
-  UNIQUE(node_id, public_key),
-  UNIQUE(node_id, client_address)
-);
-CREATE INDEX ix_peers_user_id ON peers(user_id);
-CREATE INDEX ix_peers_node_id ON peers(node_id);
-CREATE INDEX ix_peers_public_key ON peers(public_key);
-```
-
-### 2.4 `peer_traffic_snapshots`
-
-```sql
-CREATE TABLE peer_traffic_snapshots (
-  id INTEGER PRIMARY KEY,
-  peer_id INTEGER NOT NULL REFERENCES peers(id) ON DELETE CASCADE,
-  node_id INTEGER NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-  captured_at TIMESTAMP NOT NULL,
-  transfer_rx_total BIGINT NOT NULL,
-  transfer_tx_total BIGINT NOT NULL,
-  delta_rx_bytes BIGINT NOT NULL DEFAULT 0,
-  delta_tx_bytes BIGINT NOT NULL DEFAULT 0,
-  latest_handshake_at TIMESTAMP NULL,
-  UNIQUE(peer_id, captured_at)
-);
-CREATE INDEX ix_peer_traffic_snapshots_peer_id ON peer_traffic_snapshots(peer_id);
-CREATE INDEX ix_peer_traffic_snapshots_captured_at ON peer_traffic_snapshots(captured_at);
-```
-
-### 2.5 `daily_traffic_summaries`
-
-```sql
-CREATE TABLE daily_traffic_summaries (
-  id INTEGER PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  node_id INTEGER NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-  traffic_date DATE NOT NULL,
-  rx_bytes BIGINT NOT NULL DEFAULT 0,
-  tx_bytes BIGINT NOT NULL DEFAULT 0,
-  total_bytes BIGINT NOT NULL DEFAULT 0,
-  latest_handshake_at TIMESTAMP NULL,
-  updated_at TIMESTAMP NOT NULL,
-  UNIQUE(user_id, node_id, traffic_date)
-);
-CREATE INDEX ix_daily_traffic_summaries_user_id ON daily_traffic_summaries(user_id);
-CREATE INDEX ix_daily_traffic_summaries_traffic_date ON daily_traffic_summaries(traffic_date);
-```
-
-### 2.6 `subscription_access_logs`
-
-```sql
-CREATE TABLE subscription_access_logs (
-  id INTEGER PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token VARCHAR(128) NOT NULL,
-  resource VARCHAR(64) NOT NULL,
-  client_ip VARCHAR(64) NULL,
-  user_agent VARCHAR(512) NULL,
-  requested_at TIMESTAMP NOT NULL
-);
-CREATE INDEX ix_subscription_access_logs_user_id ON subscription_access_logs(user_id);
-CREATE INDEX ix_subscription_access_logs_token ON subscription_access_logs(token);
-CREATE INDEX ix_subscription_access_logs_requested_at ON subscription_access_logs(requested_at);
-```
-
-## 3. 项目目录结构
+## 3. 核心目录
 
 ```text
 WardenWG/
@@ -174,131 +37,224 @@ WardenWG/
 │  ├─ services/
 │  ├─ tasks/
 │  ├─ templates/
-│  └─ main.py
-├─ migrations/
+│  ├─ main.py
+│  └─ web.py
 ├─ scripts/
-├─ .env.example
+│  ├─ seed_nodes.py
+│  └─ wardenwg_merge_peers.py
+├─ migrations/
 ├─ Dockerfile
 ├─ docker-compose.yml
 ├─ pyproject.toml
-└─ README.md
+└─ .env.example
 ```
 
-## 4. 核心代码骨架
+## 4. 数据模型
 
-### 4.1 创建用户
+主要表：
 
-- `POST /api/v1/users`
-- 自动生成订阅 token
-- 自动生成 3 个节点 peer
-- 自动分配 `10.66.x.0/24` 中未占用地址
+- `users`
+- `nodes`
+- `peers`
+- `peer_traffic_snapshots`
+- `daily_traffic_summaries`
+- `subscription_access_logs`
 
-### 4.2 管理接口
+用途：
 
-- `GET /api/v1/users`
-- `GET /api/v1/users/{id}`
-- `POST /api/v1/users/{id}/enable`
-- `POST /api/v1/users/{id}/disable`
-- `GET /api/v1/users/{id}/subscription`
-- `GET /api/v1/users/{id}/traffic`
-- `POST /api/v1/users/{id}/rotate-token`
-- `GET /api/v1/nodes`
-- `POST /api/v1/nodes/seed`
-- `POST /api/v1/tasks/collect-traffic`
-- `POST /api/v1/tasks/sync-peers`
+- `users`：用户状态、订阅 token、流量配额
+- `nodes`：节点出口、SSH 与 WireGuard 基本信息
+- `peers`：每个用户在每台节点上的独立 Peer
+- `peer_traffic_snapshots`：定时采集到的累计计数器快照
+- `daily_traffic_summaries`：按日汇总后的用户流量
+- `subscription_access_logs`：订阅访问记录
 
-### 4.3 订阅接口
+## 5. 管理后台
 
-- `GET /sub/{token}/main.yaml`
-- `GET /sub/{token}/nodes.yaml`
+地址：
 
-## 5. 订阅模板
+- `GET /admin/login`
+- `GET /admin`
 
-- `main.yaml.j2`：一个主配置，包含 `proxy-providers` 和 `rule-providers`
-- `nodes.yaml.j2`：用户自己的 3 个 WireGuard 节点
-- 规则集默认使用 MetaCubeX `meta-rules-dat`
+功能：
 
-规则集 URL 基于官方仓库：
+- 创建用户
+- 查看用户的三节点 Peer 地址
+- 查看订阅主链接
+- 启用 / 禁用用户
+- 轮换订阅 token
+- 立即采集流量
+- 立即同步 Peer 到三台节点
 
-- [MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat)
+认证：
 
-## 6. 流量采集逻辑
+- 登录输入 `.env` 中的 `ADMIN_API_KEY`
+- 登录后服务端生成短期会话 Cookie
 
-1. 调度器每 5 分钟执行一次。
-2. 对每个节点执行 `wg show wg0 dump`。
-3. 通过 `public_key` 映射数据库中的 `peers`。
-4. 与上次累计值比较，得到 `delta_rx_bytes` 和 `delta_tx_bytes`。
-5. 写入 `peer_traffic_snapshots`。
-6. 以天为粒度累加到 `daily_traffic_summaries`。
+## 6. 用户前台
 
-## 7. 节点同步机制建议
+地址：
 
-MVP 建议：
+- `GET /portal/login`
+- `GET /portal`
 
-- 不直接整个覆盖 `/etc/wireguard/wg0.conf`
-- 只维护一段 `managed-by=wardenwg` 的 peer 区块
-- 在节点上准备一个合并脚本，将 managed peers 合并进主配置
-- 合并后执行 `wg syncconf` 或 `wg setconf`
+功能：
 
-为什么这样做：
+- 查看 `main.yaml`
+- 查看 `nodes.yaml`
+- 查看自己三台节点的 Peer 信息
+- 查看按节点、按日的流量统计
 
-- 比全文件覆盖更稳，能保留已有 Interface/NAT 配置
-- 比完全依赖热更新脚本更容易落地
-- 后续可以演进为“数据库为源 + 节点持久化配置双写”
+登录方式：
 
-## 8. 部署方案
+- 输入自己的 `subscription_token`
+- 或通过 `/portal?token=<subscription_token>` 直接进入
 
-### 8.1 在 `10.0.0.206` 部署
+## 7. 环境变量
 
-建议放在 manager 节点 `10.0.0.206`，因为它已经有：
+最关键的配置如下：
 
-- Docker Swarm manager
-- Nginx Proxy Manager
-- Portainer
+```env
+APP_NAME=WardenWG
+APP_ENV=prod
+DEBUG=false
+DATABASE_URL=sqlite:////app/data/wardenwg.db
+TIMEZONE=Asia/Shanghai
 
-### 8.2 Docker Compose
+MANAGER_BASE_URL=https://sub.wfqc8.cn
+SUBSCRIPTION_BASE_URL=https://sub.wfqc8.cn
+SUBSCRIPTION_DISPLAY_NAME=WFQC8
+API_PREFIX=/api/v1
+
+ADMIN_API_KEY=change-me
+
+WG_CONFIG_NAME=wg0
+WG_INTERFACE_MTU=1420
+WG_PERSISTENT_KEEPALIVE=25
+
+SSH_PORT=5522
+SSH_USERNAME=root
+SSH_PRIVATE_KEY_PATH=
+SSH_PASSWORD=your-ssh-password
+
+TRAFFIC_COLLECTION_INTERVAL_MINUTES=5
+DEFAULT_RULESET_BASE_URL=https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo
+```
+
+说明：
+
+- Docker 容器内 SQLite 路径必须写成 `/app/data/...`
+- SSH 认证支持“优先私钥，其次密码”
+- 如果暂时没有密钥，可以先用 `SSH_PASSWORD`
+- `SUBSCRIPTION_DISPLAY_NAME` 会作为客户端订阅卡片显示名称，默认 `WFQC8`
+
+## 8. 部署
+
+### 8.1 启动服务
 
 ```bash
-cp .env.example .env
 docker compose up -d --build
+```
+
+### 8.2 初始化节点
+
+```bash
+docker compose exec api python scripts/seed_nodes.py
 ```
 
 ### 8.3 NPM 反代
 
-- 域名：`sub.wfqc8.cn`
-- Forward Host：WardenWG 容器所在主机 IP
-- Forward Port：`8000`
-- 勾选 WebSocket 支持
-- 申请 Let’s Encrypt 证书
+将 `sub.wfqc8.cn` 反代到：
 
-### 8.4 环境变量
+- Host：`10.0.0.206`
+- Port：`8000`
+- Scheme：`http`
 
-- `DATABASE_URL`：开发先用 SQLite，生产换 PostgreSQL
-- `ADMIN_API_KEY`：管理接口鉴权
-- `SSH_PRIVATE_KEY_PATH` / `SSH_PASSWORD`：用于拉取 `wg dump` 和同步 peer，优先私钥，其次密码
-- `SUBSCRIPTION_BASE_URL`：对外订阅地址前缀
+建议开启：
 
-## 9. 安全设计
+- Force SSL
+- HTTP/2
+- HSTS
+- Block Common Exploits
 
-- 用户订阅 token 使用 `secrets.token_urlsafe`
-- 支持 token 轮换接口，旧 token 立即失效
-- 管理 API 使用 `X-API-Key`
-- 订阅 URL 足够长，不建议弱 token
-- `nodes.yaml` 含用户私钥，只能通过用户专属 token 返回
-- 日志不打印 `private_key`、`subscription_token`
-- SSH 私钥通过 Docker secret 或宿主机只读挂载注入
-- 如果当前只有 SSH 账号密码，也可以先用 `SSH_PASSWORD` 跑 MVP，后续再切到密钥认证
+## 9. Peer 同步脚本
 
-## 10. 下一步最小实施路径
+项目内置节点合并脚本：
 
-1. 先在本机启动 API 与 SQLite，验证用户创建、订阅生成、流量接口可用。
-2. 执行 `python scripts/seed_nodes.py` 写入 3 个现有节点。
-3. 创建一个测试用户，检查 `main.yaml` 和 `nodes.yaml` 是否能被 Mihomo 导入。
-4. 在 206 节点先准备 `wardenwg-merge-peers` 合并脚本，再打通 `sync-peers`。
-5. 最后再接入真实 SSH 拉取 `wg show wg0 dump`，验证日统计闭环。
+- [scripts/wardenwg_merge_peers.py](/C:/Users/EDY/Desktop/server/WardenWG/scripts/wardenwg_merge_peers.py)
+
+需要部署到三台节点：
+
+- `/usr/local/bin/wardenwg-merge-peers`
+
+并赋权：
+
+```bash
+chmod 755 /usr/local/bin/wardenwg-merge-peers
+```
+
+这个脚本会：
+
+- 保留原有 `Interface` 和非托管 Peer
+- 只替换 `managed-by=wardenwg` 标记区块
+- 先通过 `wg-quick strip` 转成内核可接受格式
+- 再执行 `wg syncconf`
+
+## 10. 验证链路
+
+### 10.1 健康检查
+
+```bash
+curl http://127.0.0.1:8000/healthz
+```
+
+### 10.2 创建用户
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $ADMIN_API_KEY" \
+  http://127.0.0.1:8000/api/v1/users \
+  -d '{"username":"test001","remark":"first user"}'
+```
+
+### 10.3 同步 Peer
+
+```bash
+curl -X POST \
+  -H "X-API-Key: $ADMIN_API_KEY" \
+  http://127.0.0.1:8000/api/v1/tasks/sync-peers
+```
+
+### 10.4 采集流量
+
+```bash
+curl -X POST \
+  -H "X-API-Key: $ADMIN_API_KEY" \
+  http://127.0.0.1:8000/api/v1/tasks/collect-traffic
+```
+
+### 10.5 查询用户流量
+
+```bash
+curl \
+  -H "X-API-Key: $ADMIN_API_KEY" \
+  http://127.0.0.1:8000/api/v1/users/1/traffic
+```
+
+### 10.6 订阅卡片名称与流量条
+
+订阅接口会返回以下响应头，兼容 Mihomo / Clash Verge 一类客户端：
+
+- `Content-Disposition`：设置订阅显示名称，默认 `WFQC8`
+- `Subscription-Userinfo`：显示流量进度条
+- `Profile-Web-Page-Url`：跳转到用户前台
+- `Profile-Update-Interval`：提示客户端 24 小时更新一次
 
 ## 11. 当前限制
 
-- Alembic 仅留目录说明，未生成完整迁移脚本。
-- 远程节点合并脚本未内置到服务器，需要你在 206/100/101 上补一个统一脚本。
-- 生产环境建议把 SQLite 切换成 PostgreSQL。
+- Alembic 目录已预留，但迁移脚本未完善
+- Web 会话是进程内存会话，重启容器后需要重新登录
+- 管理后台目前仍使用单一 `ADMIN_API_KEY` 登录，不是多管理员体系
+- 用户前台当前基于 `subscription_token` 登录，尚未单独拆用户密码体系
+- 生产环境建议后续切换到 PostgreSQL

@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-import paramiko
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -31,10 +30,10 @@ class NodeSyncService:
             f"AllowedIPs = {peer.client_address}\n"
         )
 
-    def render_full_config(self, node: Node, peers: list[Peer]) -> str:
+    def render_full_config(self, peers: list[Peer]) -> str:
         header = (
-            "# 该片段仅用于说明管理面写入的 peer 区块。\n"
-            "# MVP 阶段建议保留现有 Interface 段和 NAT 规则，只替换 managed peers 部分。\n"
+            "# 管理面仅维护下方 managed peers 区块。\n"
+            "# 建议保留原有 Interface、NAT 与非托管 Peer 配置。\n"
             "# managed-by=wardenwg begin\n"
         )
         body = "\n".join(self.render_peer_block(peer) for peer in peers)
@@ -49,7 +48,7 @@ class NodeSyncService:
             .filter(User.is_active.is_(True))
             .all()
         )
-        config_snippet = self.render_full_config(node, peers)
+        config_snippet = self.render_full_config(peers)
 
         if settings.app_env == "dev":
             for peer in peers:
@@ -63,7 +62,7 @@ class NodeSyncService:
         with sftp.open(remote_tmp, "w") as remote_file:
             remote_file.write(config_snippet)
         sftp.close()
-        stdin, stdout, stderr = client.exec_command(
+        _, stdout, stderr = client.exec_command(
             "python3 /usr/local/bin/wardenwg-merge-peers "
             f"{settings.wg_config_name} {remote_tmp}"
         )
@@ -79,3 +78,4 @@ class NodeSyncService:
     def sync_all_nodes(self, db: Session) -> list[SyncResult]:
         nodes = db.query(Node).filter(Node.is_active.is_(True)).order_by(Node.sort_order).all()
         return [self.sync_node(db, node) for node in nodes]
+
