@@ -3,11 +3,15 @@
 {% block content %}
 <div class="auth-wrap panel">
   <h1>用户前台</h1>
-  <p class="muted">输入你的订阅令牌，查看专属订阅地址和流量使用情况。</p>
+  <p class="muted">使用账号密码登录，查看订阅地址和流量信息。</p>
   <form method="post" action="/portal/login" class="grid">
     <label>
-      <div>订阅令牌</div>
-      <input type="text" name="token" placeholder="输入 subscription_token" required>
+      <div>用户名</div>
+      <input type="text" name="username" placeholder="输入用户名" required>
+    </label>
+    <label>
+      <div>密码</div>
+      <input type="password" name="password" placeholder="输入密码" required>
     </label>
     <button type="submit">进入前台</button>
   </form>
@@ -16,4 +20,3 @@
   {% endif %}
 </div>
 {% endblock %}
-

@@ -19,12 +19,14 @@ from app.services.sessions import session_store
 from app.services.traffic import TrafficCollectorService
 from app.services.traffic_queries import get_device_traffic_rows
 from app.services.users import UserService
+from app.services.web_auth import WebAuthService
 
 settings = get_settings()
 templates = Jinja2Templates(directory=str(settings.template_dir))
 router = APIRouter(tags=["web"])
 
 user_service = UserService()
+web_auth_service = WebAuthService(user_service)
 traffic_service = TrafficCollectorService()
 node_sync_service = NodeSyncService()
 
@@ -62,6 +64,10 @@ def _redirect(url: str, status_code: int = status.HTTP_303_SEE_OTHER) -> Redirec
     return RedirectResponse(url=url, status_code=status_code)
 
 
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
 @router.get("/")
 def index() -> RedirectResponse:
     return _redirect("/admin")
@@ -73,15 +79,35 @@ def admin_login_page(request: Request) -> Response:
 
 
 @router.post("/admin/login")
-def admin_login(request: Request, admin_api_key: str = Form(...)) -> Response:
-    if admin_api_key != settings.admin_api_key:
+def admin_login(
+    request: Request,
+    username: str = Form(default=""),
+    password: str = Form(default=""),
+    db: Session = Depends(get_db),
+) -> Response:
+    client_ip = _client_ip(request)
+    if web_auth_service.is_ip_blocked(db, client_ip):
         return templates.TemplateResponse(
             request,
             "admin_login.html",
-            {"error": "管理密钥错误"},
+            {"error": "该 IP 登录失败次数过多，已被封禁"},
+            status_code=403,
+        )
+
+    result = web_auth_service.authenticate_admin(db, username.strip(), password)
+    if not result.ok:
+        web_auth_service.record_failed_login(db, client_ip)
+        db.commit()
+        return templates.TemplateResponse(
+            request,
+            "admin_login.html",
+            {"error": "用户名或密码错误"},
             status_code=400,
         )
-    token = session_store.create(subject="admin", role="admin")
+
+    web_auth_service.clear_failed_login(db, client_ip)
+    db.commit()
+    token = session_store.create(subject=result.account.username if result.account else "admin", role="admin")
     response = _redirect("/admin")
     response.set_cookie(
         ADMIN_COOKIE,
@@ -242,18 +268,35 @@ def portal_login_page(request: Request) -> Response:
 
 
 @router.post("/portal/login")
-def portal_login(request: Request, token: str = Form(...), db: Session = Depends(get_db)) -> Response:
-    try:
-        device = user_service.get_device_by_token(db, token.strip())
-        user_service.validate_device_subscription(device)
-    except ValueError:
+def portal_login(
+    request: Request,
+    username: str = Form(default=""),
+    password: str = Form(default=""),
+    db: Session = Depends(get_db),
+) -> Response:
+    client_ip = _client_ip(request)
+    if web_auth_service.is_ip_blocked(db, client_ip):
         return templates.TemplateResponse(
             request,
             "portal_login.html",
-            {"error": "订阅令牌无效或设备不可用"},
+            {"error": "该 IP 登录失败次数过多，已被封禁"},
+            status_code=403,
+        )
+
+    result = web_auth_service.authenticate_user(db, username.strip(), password)
+    if not result.ok or result.device is None:
+        web_auth_service.record_failed_login(db, client_ip)
+        db.commit()
+        return templates.TemplateResponse(
+            request,
+            "portal_login.html",
+            {"error": "用户名或密码错误，或账号不可用"},
             status_code=400,
         )
-    session_token = session_store.create(subject=device.subscription_token, role="user")
+
+    web_auth_service.clear_failed_login(db, client_ip)
+    db.commit()
+    session_token = session_store.create(subject=result.device.subscription_token, role="user")
     response = _redirect("/portal")
     response.set_cookie(
         USER_COOKIE,
@@ -298,12 +341,12 @@ def portal_home(
         except ValueError:
             return _redirect("/portal/login")
 
-    token = _get_user_session(request)
-    if not token:
+    session_subject = _get_user_session(request)
+    if not session_subject:
         return _redirect("/portal/login")
 
     try:
-        device = user_service.get_device_by_token(db, token)
+        device = user_service.get_device_by_token(db, session_subject)
         user_service.validate_device_subscription(device)
     except ValueError:
         session_store.delete(request.cookies.get(USER_COOKIE))
@@ -332,4 +375,3 @@ def portal_home(
             "nodes_yaml_url": f"{settings.subscription_base_url}/sub/{device.subscription_token}/nodes.yaml",
         },
     )
-

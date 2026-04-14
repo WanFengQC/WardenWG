@@ -1,13 +1,17 @@
 {% extends "base.html" %}
-{% block title %}管理后台登录{% endblock %}
+{% block title %}管理员后台登录{% endblock %}
 {% block content %}
 <div class="auth-wrap panel">
   <h1>WardenWG 管理后台</h1>
-  <p class="muted">使用管理密钥登录，进入用户、订阅、流量与节点同步控制台。</p>
+  <p class="muted">使用管理员账号密码登录后台。</p>
   <form method="post" action="/admin/login" class="grid">
     <label>
-      <div>管理密钥</div>
-      <input type="password" name="admin_api_key" placeholder="输入 ADMIN_API_KEY" required>
+      <div>用户名</div>
+      <input type="text" name="username" placeholder="输入管理员用户名" required>
+    </label>
+    <label>
+      <div>密码</div>
+      <input type="password" name="password" placeholder="输入密码" required>
     </label>
     <button type="submit">进入后台</button>
   </form>
@@ -16,4 +20,3 @@
   {% endif %}
 </div>
 {% endblock %}
-
