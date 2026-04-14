@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     debug: bool = False
     database_url: str = "sqlite:///./wardenwg.db"
-    timezone: str = "Asia/Shanghai"
+    timezone: str = "UTC"
     manager_base_url: str = "https://sub.wfqc8.cn"
     subscription_base_url: str = "https://sub.wfqc8.cn"
     subscription_display_name: str = "WFQC8"
