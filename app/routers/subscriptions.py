@@ -1,4 +1,5 @@
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from sqlalchemy.orm import Session
@@ -48,7 +49,15 @@ def _build_subscription_headers(user, filename: str) -> dict[str, str]:
     upload = sum(peer.transfer_tx_total for peer in user.peers)
     download = sum(peer.transfer_rx_total for peer in user.peers)
     total = user.total_quota_bytes if user.total_quota_bytes is not None else download + upload
-    expire = int(user.expires_at.timestamp()) if user.expires_at else 0
+    expire = 0
+    if user.expires_at:
+        tz = ZoneInfo(settings.timezone)
+        expires_at = user.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=tz)
+        else:
+            expires_at = expires_at.astimezone(tz)
+        expire = int(expires_at.timestamp())
     display_name = settings.subscription_display_name.strip() or "WFQC8"
     encoded_filename = quote(filename)
     return {
@@ -72,7 +81,7 @@ def get_main_yaml(
     user = _load_subscription_user(db, token)
     body = subscription_service.build_main_yaml(user)
     _write_access_log(db, user.id, token, "main.yaml", request, user_agent)
-    filename = f"{settings.subscription_display_name or 'WFQC8'}.yaml"
+    filename = settings.subscription_display_name or "WFQC8"
     return Response(
         content=body,
         media_type="text/yaml; charset=utf-8",
@@ -90,7 +99,7 @@ def get_nodes_yaml(
     user = _load_subscription_user(db, token)
     body = subscription_service.build_nodes_yaml(user)
     _write_access_log(db, user.id, token, "nodes.yaml", request, user_agent)
-    filename = f"{settings.subscription_display_name or 'WFQC8'}-nodes.yaml"
+    filename = f"{settings.subscription_display_name or 'WFQC8'}-nodes"
     return Response(
         content=body,
         media_type="text/yaml; charset=utf-8",
