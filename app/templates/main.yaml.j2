@@ -9,6 +9,14 @@ profile:
   store-selected: true
   store-fake-ip: true
 
+dns:
+  enable: true
+  ipv6: false
+  enhanced-mode: fake-ip
+  nameserver:
+    - 1.1.1.1
+    - 8.8.8.8
+
 proxy-providers:
   wardenwg-nodes:
     type: http
@@ -25,6 +33,8 @@ proxy-groups:
     type: select
     use:
       - wardenwg-nodes
+    proxies:
+      - DIRECT
   - name: AUTO
     type: url-test
     use:
@@ -32,11 +42,6 @@ proxy-groups:
     url: https://cp.cloudflare.com/generate_204
     interval: 300
     tolerance: 100
-  - name: ADS
-    type: select
-    proxies:
-      - REJECT
-      - DIRECT
   - name: FINAL
     type: select
     proxies:
@@ -44,36 +49,7 @@ proxy-groups:
       - AUTO
       - DIRECT
 
-rule-providers:
-  private:
-    type: http
-    behavior: classical
-    url: {{ ruleset_base_url }}/private.yaml
-    path: ./ruleset/private.yaml
-    interval: 86400
-  cn:
-    type: http
-    behavior: classical
-    url: {{ ruleset_base_url }}/cn.yaml
-    path: ./ruleset/cn.yaml
-    interval: 86400
-  geolocation-not-cn:
-    type: http
-    behavior: classical
-    url: {{ ruleset_base_url }}/geolocation-!cn.yaml
-    path: ./ruleset/geolocation-!cn.yaml
-    interval: 86400
-  ads:
-    type: http
-    behavior: classical
-    url: {{ ruleset_base_url }}/category-ads-all.yaml
-    path: ./ruleset/category-ads-all.yaml
-    interval: 86400
-
 rules:
-  - RULE-SET,private,DIRECT
-  - RULE-SET,cn,DIRECT
-  - RULE-SET,ads,ADS
-  - RULE-SET,geolocation-not-cn,PROXY
-  - MATCH,FINAL
+  - GEOIP,CN,DIRECT
+  - MATCH,PROXY
 
