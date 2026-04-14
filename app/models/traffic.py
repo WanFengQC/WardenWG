@@ -12,6 +12,7 @@ class PeerTrafficSnapshot(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     peer_id: Mapped[int] = mapped_column(ForeignKey("peers.id", ondelete="CASCADE"), index=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), index=True)
     node_id: Mapped[int] = mapped_column(ForeignKey("nodes.id", ondelete="CASCADE"), index=True)
     captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     transfer_rx_total: Mapped[int] = mapped_column(BigInteger, nullable=False)
@@ -25,10 +26,13 @@ class PeerTrafficSnapshot(Base):
 
 class DailyTrafficSummary(Base):
     __tablename__ = "daily_traffic_summaries"
-    __table_args__ = (UniqueConstraint("user_id", "node_id", "traffic_date", name="uq_daily_summary"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "device_id", "node_id", "traffic_date", name="uq_daily_summary"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), index=True)
     node_id: Mapped[int] = mapped_column(ForeignKey("nodes.id", ondelete="CASCADE"), index=True)
     traffic_date: Mapped[date] = mapped_column(Date, index=True)
     rx_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
@@ -42,4 +46,4 @@ class DailyTrafficSummary(Base):
     )
 
     user = relationship("User", back_populates="summaries")
-
+    device = relationship("Device", back_populates="summaries")

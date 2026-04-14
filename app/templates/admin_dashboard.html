@@ -16,7 +16,7 @@
 <div class="grid cards">
   <section class="panel"><div class="muted">总用户数</div><div class="card-number">{{ total_users }}</div></section>
   <section class="panel"><div class="muted">启用用户</div><div class="card-number">{{ active_users }}</div></section>
-  <section class="panel"><div class="muted">节点数</div><div class="card-number">{{ nodes|length }}</div></section>
+  <section class="panel"><div class="muted">设备数</div><div class="card-number">{{ total_devices }}</div></section>
   <section class="panel"><div class="muted">累计流量</div><div class="card-number">{{ total_used|filesize }}</div></section>
 </div>
 
@@ -31,10 +31,11 @@
     <h2>创建用户</h2>
     <form method="post" action="/admin/users" class="grid">
       <label><div>用户名</div><input name="username" required placeholder="例如 test002"></label>
+      <label><div>首台设备名</div><input name="initial_device_name" value="default" required placeholder="例如 iphone"></label>
       <label><div>到期时间</div><input type="datetime-local" name="expires_at"></label>
       <label><div>总流量配额（GB）</div><input name="total_quota_gb" placeholder="留空表示不限额"></label>
       <label><div>备注</div><textarea name="remark" placeholder="例如 月付测试用户"></textarea></label>
-      <button type="submit">创建并生成三节点 Peer</button>
+      <button type="submit">创建用户并生成首台设备 Peer</button>
     </form>
   </section>
   <section class="panel">
@@ -64,8 +65,7 @@
         <th>用户名</th>
         <th>状态</th>
         <th>已用流量</th>
-        <th>订阅入口</th>
-        <th>Peer</th>
+        <th>设备</th>
         <th>操作</th>
       </tr>
     </thead>
@@ -83,23 +83,48 @@
           </span>
         </td>
         <td>{{ user.used_bytes|filesize }}</td>
-        <td class="mono">
-          {{ subscription_base_url }}/sub/{{ user.subscription_token }}/main.yaml
-        </td>
-        <td class="mono">
-          {% for peer in user.peers %}
-            {{ peer.node.name }} → {{ peer.client_address }}<br>
+        <td>
+          {% for device in user.devices %}
+          <div class="panel" style="padding: 14px; margin-bottom: 10px; border-radius: 16px; box-shadow: none;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+              <div>
+                <strong>{{ device.name }}</strong>
+                <span class="status{% if not device.is_active %} off{% endif %}" style="margin-left:8px;">
+                  {{ "启用" if device.is_active else "禁用" }}
+                </span>
+              </div>
+              <div class="muted">{{ device.used_bytes|filesize }}</div>
+            </div>
+            <div class="mono" style="margin-top:8px;">
+              {{ subscription_base_url }}/sub/{{ device.subscription_token }}/main.yaml
+            </div>
+            <div class="mono" style="margin-top:8px;">
+              {% for peer in device.peers %}
+                {{ peer.node.name }} → {{ peer.client_address }}<br>
+              {% endfor %}
+            </div>
+            <div class="inline-actions" style="margin-top:10px;">
+              <form method="post" action="/admin/devices/{{ device.id }}/toggle">
+                <button class="alt" type="submit">{{ "禁用设备" if device.is_active else "启用设备" }}</button>
+              </form>
+              <form method="post" action="/admin/devices/{{ device.id }}/rotate-token">
+                <button class="warn" type="submit">轮换设备订阅</button>
+              </form>
+              <a class="button alt" href="/portal?token={{ device.subscription_token }}">设备前台</a>
+            </div>
+          </div>
           {% endfor %}
+          <form method="post" action="/admin/users/{{ user.id }}/devices" class="grid" style="margin-top:12px;">
+            <input name="name" placeholder="新增设备名，例如 ipad" required>
+            <input name="remark" placeholder="设备备注，可选">
+            <button type="submit">新增设备</button>
+          </form>
         </td>
         <td>
           <div class="inline-actions">
             <form method="post" action="/admin/users/{{ user.id }}/toggle">
               <button class="alt" type="submit">{{ "禁用" if user.is_active else "启用" }}</button>
             </form>
-            <form method="post" action="/admin/users/{{ user.id }}/rotate-token">
-              <button class="warn" type="submit">轮换订阅</button>
-            </form>
-            <a class="button alt" href="/portal?token={{ user.subscription_token }}">用户前台</a>
           </div>
         </td>
       </tr>

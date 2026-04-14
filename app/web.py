@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from secrets import token_urlsafe
 
 from fastapi import APIRouter, Depends, Form, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
@@ -12,11 +13,11 @@ from app.core.config import get_settings
 from app.db.database import get_db
 from app.models.node import Node
 from app.models.user import User
-from app.schemas.user import UserCreate
+from app.schemas.user import DeviceCreate, UserCreate
 from app.services.node_sync import NodeSyncService
 from app.services.sessions import session_store
 from app.services.traffic import TrafficCollectorService
-from app.services.traffic_queries import get_user_traffic_rows
+from app.services.traffic_queries import get_device_traffic_rows
 from app.services.users import UserService
 
 settings = get_settings()
@@ -110,6 +111,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)) -> Response
     nodes = db.scalars(select(Node).order_by(Node.sort_order.asc())).all()
     total_users = db.scalar(select(func.count(User.id))) or 0
     active_users = db.scalar(select(func.count(User.id)).where(User.is_active.is_(True))) or 0
+    total_devices = sum(len(user.devices) for user in users)
     total_used = sum(user.used_bytes for user in users)
     return templates.TemplateResponse(
         request,
@@ -119,6 +121,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)) -> Response
             "nodes": nodes,
             "total_users": total_users,
             "active_users": active_users,
+            "total_devices": total_devices,
             "total_used": total_used,
             "subscription_base_url": settings.subscription_base_url,
             "now": datetime.now(),
@@ -131,6 +134,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)) -> Response
 def admin_create_user(
     request: Request,
     username: str = Form(...),
+    initial_device_name: str = Form(default="default"),
     remark: str = Form(default=""),
     total_quota_gb: str = Form(default=""),
     expires_at: str = Form(default=""),
@@ -146,13 +150,35 @@ def admin_create_user(
         if expires_at.strip():
             expire_dt = datetime.fromisoformat(expires_at)
 
-        payload = UserCreate(
-            username=username.strip(),
-            remark=remark.strip() or None,
-            total_quota_bytes=quota_bytes,
-            expires_at=expire_dt,
+        user_service.create_user(
+            db,
+            UserCreate(
+                username=username.strip(),
+                initial_device_name=initial_device_name.strip() or "default",
+                remark=remark.strip() or None,
+                total_quota_bytes=quota_bytes,
+                expires_at=expire_dt,
+            ),
         )
-        user_service.create_user(db, payload)
+        db.commit()
+        return _redirect("/admin")
+    except ValueError as exc:
+        db.rollback()
+        return _redirect(f"/admin?error={str(exc)}")
+
+
+@router.post("/admin/users/{user_id}/devices")
+def admin_create_device(
+    user_id: int,
+    request: Request,
+    name: str = Form(...),
+    remark: str = Form(default=""),
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    if not _get_admin_session(request):
+        return _redirect("/admin/login")
+    try:
+        user_service.create_device(db, user_id, DeviceCreate(name=name.strip(), remark=remark.strip() or None))
         db.commit()
         return _redirect("/admin")
     except ValueError as exc:
@@ -170,12 +196,22 @@ def admin_toggle_user(user_id: int, request: Request, db: Session = Depends(get_
     return _redirect("/admin")
 
 
-@router.post("/admin/users/{user_id}/rotate-token")
-def admin_rotate_token(user_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
+@router.post("/admin/devices/{device_id}/toggle")
+def admin_toggle_device(device_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
         return _redirect("/admin/login")
-    user = user_service.get_user_by_id(db, user_id)
-    user.subscription_token = __import__("secrets").token_urlsafe(24)
+    device = user_service.get_device_by_id(db, device_id)
+    user_service.set_device_status(db, device_id, not device.is_active)
+    db.commit()
+    return _redirect("/admin")
+
+
+@router.post("/admin/devices/{device_id}/rotate-token")
+def admin_rotate_device_token(device_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
+    if not _get_admin_session(request):
+        return _redirect("/admin/login")
+    device = user_service.get_device_by_id(db, device_id)
+    device.subscription_token = token_urlsafe(24)
     db.commit()
     return _redirect("/admin")
 
@@ -208,16 +244,16 @@ def portal_login_page(request: Request) -> Response:
 @router.post("/portal/login")
 def portal_login(request: Request, token: str = Form(...), db: Session = Depends(get_db)) -> Response:
     try:
-        user = user_service.get_user_by_token(db, token.strip())
-        user_service.validate_subscription_user(user)
+        device = user_service.get_device_by_token(db, token.strip())
+        user_service.validate_device_subscription(device)
     except ValueError:
         return templates.TemplateResponse(
             request,
             "portal_login.html",
-            {"error": "订阅令牌无效或用户不可用"},
+            {"error": "订阅令牌无效或设备不可用"},
             status_code=400,
         )
-    session_token = session_store.create(subject=user.subscription_token, role="user")
+    session_token = session_store.create(subject=device.subscription_token, role="user")
     response = _redirect("/portal")
     response.set_cookie(
         USER_COOKIE,
@@ -246,9 +282,9 @@ def portal_home(
 ) -> Response:
     if token:
         try:
-            user = user_service.get_user_by_token(db, token)
-            user_service.validate_subscription_user(user)
-            session_token = session_store.create(subject=user.subscription_token, role="user")
+            device = user_service.get_device_by_token(db, token)
+            user_service.validate_device_subscription(device)
+            session_token = session_store.create(subject=device.subscription_token, role="user")
             response = _redirect("/portal")
             response.set_cookie(
                 USER_COOKIE,
@@ -267,13 +303,13 @@ def portal_home(
         return _redirect("/portal/login")
 
     try:
-        user = user_service.get_user_by_token(db, token)
-        user_service.validate_subscription_user(user)
+        device = user_service.get_device_by_token(db, token)
+        user_service.validate_device_subscription(device)
     except ValueError:
         session_store.delete(request.cookies.get(USER_COOKIE))
         return _redirect("/portal/login")
 
-    rows = get_user_traffic_rows(db, user.id)
+    rows = get_device_traffic_rows(db, device.id)
     summaries = [
         {
             "traffic_date": summary.traffic_date,
@@ -285,15 +321,15 @@ def portal_home(
         }
         for summary, node_name in rows
     ]
-    main_yaml_url = f"{settings.subscription_base_url}/sub/{user.subscription_token}/main.yaml"
-    nodes_yaml_url = f"{settings.subscription_base_url}/sub/{user.subscription_token}/nodes.yaml"
     return templates.TemplateResponse(
         request,
         "portal_home.html",
         {
-            "user": user,
+            "user": device.user,
+            "device": device,
             "summaries": summaries,
-            "main_yaml_url": main_yaml_url,
-            "nodes_yaml_url": nodes_yaml_url,
+            "main_yaml_url": f"{settings.subscription_base_url}/sub/{device.subscription_token}/main.yaml",
+            "nodes_yaml_url": f"{settings.subscription_base_url}/sub/{device.subscription_token}/nodes.yaml",
         },
     )
+

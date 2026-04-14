@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
+from app.models.device import Device
 from app.models.node import Node
 from app.models.peer import Peer
 from app.models.traffic import DailyTrafficSummary, PeerTrafficSnapshot
@@ -84,6 +85,7 @@ class TrafficCollectorService:
             peer.latest_handshake_at = record.latest_handshake_at
             snapshot = PeerTrafficSnapshot(
                 peer_id=peer.id,
+                device_id=peer.device_id,
                 node_id=node.id,
                 captured_at=captured_at,
                 transfer_rx_total=record.transfer_rx_total,
@@ -93,7 +95,9 @@ class TrafficCollectorService:
                 latest_handshake_at=record.latest_handshake_at,
             )
             db.add(snapshot)
-            self._upsert_daily_summary(db, peer, node, captured_at, delta_rx, delta_tx, record.latest_handshake_at)
+            self._upsert_daily_summary(
+                db, peer, node, captured_at, delta_rx, delta_tx, record.latest_handshake_at
+            )
             touched += 1
         return touched
 
@@ -111,6 +115,7 @@ class TrafficCollectorService:
         summary = db.scalar(
             select(DailyTrafficSummary).where(
                 DailyTrafficSummary.user_id == peer.user_id,
+                DailyTrafficSummary.device_id == peer.device_id,
                 DailyTrafficSummary.node_id == node.id,
                 DailyTrafficSummary.traffic_date == traffic_date,
             )
@@ -118,6 +123,7 @@ class TrafficCollectorService:
         if summary is None:
             summary = DailyTrafficSummary(
                 user_id=peer.user_id,
+                device_id=peer.device_id,
                 node_id=node.id,
                 traffic_date=traffic_date,
                 rx_bytes=0,
@@ -131,3 +137,4 @@ class TrafficCollectorService:
         if handshake_at and (summary.latest_handshake_at is None or handshake_at > summary.latest_handshake_at):
             summary.latest_handshake_at = handshake_at
         peer.user.used_bytes += delta_rx + delta_tx
+        peer.device.used_bytes += delta_rx + delta_tx

@@ -3,8 +3,8 @@
 {% block content %}
 <div class="hero">
   <div>
-    <h1>{{ user.username }} 的订阅中心</h1>
-    <p>查看主订阅、节点订阅和按节点日流量统计。</p>
+    <h1>{{ user.username }} / {{ device.name }}</h1>
+    <p>当前展示的是设备级订阅和设备级流量统计。每台设备使用独立 Peer，可同时在线。</p>
   </div>
   <div class="toolbar">
     <form method="post" action="/portal/logout"><button class="danger" type="submit">退出</button></form>
@@ -12,8 +12,9 @@
 </div>
 
 <div class="grid cards">
-  <section class="panel"><div class="muted">账户状态</div><div class="card-number">{{ "正常" if user.is_active else "禁用" }}</div></section>
-  <section class="panel"><div class="muted">累计用量</div><div class="card-number">{{ user.used_bytes|filesize }}</div></section>
+  <section class="panel"><div class="muted">用户状态</div><div class="card-number">{{ "正常" if user.is_active else "禁用" }}</div></section>
+  <section class="panel"><div class="muted">设备状态</div><div class="card-number">{{ "正常" if device.is_active else "禁用" }}</div></section>
+  <section class="panel"><div class="muted">设备用量</div><div class="card-number">{{ device.used_bytes|filesize }}</div></section>
   <section class="panel"><div class="muted">到期时间</div><div class="card-number" style="font-size:20px">{{ user.expires_at|datetime }}</div></section>
   <section class="panel"><div class="muted">配额</div><div class="card-number" style="font-size:20px">{{ user.total_quota_bytes|filesize if user.total_quota_bytes else "不限额" }}</div></section>
 </div>
@@ -31,7 +32,7 @@
     <table>
       <thead><tr><th>节点</th><th>地址</th><th>公钥</th></tr></thead>
       <tbody>
-      {% for peer in user.peers %}
+      {% for peer in device.peers %}
       <tr>
         <td>{{ peer.node.display_name }}</td>
         <td>{{ peer.client_address }}</td>
@@ -64,4 +65,3 @@
   </table>
 </section>
 {% endblock %}
-

@@ -15,6 +15,7 @@ class Peer(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), index=True)
     node_id: Mapped[int] = mapped_column(ForeignKey("nodes.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(128), index=True)
     client_address: Mapped[str] = mapped_column(String(32))
@@ -35,6 +36,6 @@ class Peer(Base):
     )
 
     user = relationship("User", back_populates="peers")
+    device = relationship("Device", back_populates="peers")
     node = relationship("Node", back_populates="peers")
     snapshots = relationship("PeerTrafficSnapshot", back_populates="peer", cascade="all, delete-orphan")
-
