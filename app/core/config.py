@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     timezone: str = "Asia/Shanghai"
     manager_base_url: str = "https://sub.wfqc8.cn"
     subscription_base_url: str = "https://sub.wfqc8.cn"
+    subscription_display_name: str = "WFQC8"
     api_prefix: str = "/api/v1"
     admin_api_key: str = "change-me"
     wg_config_name: str = "wg0"

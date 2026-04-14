@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}用户前台{% endblock %}
+{% block content %}
+<div class="hero">
+  <div>
+    <h1>{{ user.username }} 的订阅中心</h1>
+    <p>查看主订阅、节点订阅和按节点日流量统计。</p>
+  </div>
+  <div class="toolbar">
+    <form method="post" action="/portal/logout"><button class="danger" type="submit">退出</button></form>
+  </div>
+</div>
+
+<div class="grid cards">
+  <section class="panel"><div class="muted">账户状态</div><div class="card-number">{{ "正常" if user.is_active else "禁用" }}</div></section>
+  <section class="panel"><div class="muted">累计用量</div><div class="card-number">{{ user.used_bytes|filesize }}</div></section>
+  <section class="panel"><div class="muted">到期时间</div><div class="card-number" style="font-size:20px">{{ user.expires_at|datetime }}</div></section>
+  <section class="panel"><div class="muted">配额</div><div class="card-number" style="font-size:20px">{{ user.total_quota_bytes|filesize if user.total_quota_bytes else "不限额" }}</div></section>
+</div>
+
+<div class="split" style="margin-top: 18px;">
+  <section class="panel">
+    <h2>订阅链接</h2>
+    <div class="links">
+      <a class="link-box mono" href="{{ main_yaml_url }}" target="_blank">{{ main_yaml_url }}</a>
+      <a class="link-box mono" href="{{ nodes_yaml_url }}" target="_blank">{{ nodes_yaml_url }}</a>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>节点信息</h2>
+    <table>
+      <thead><tr><th>节点</th><th>地址</th><th>公钥</th></tr></thead>
+      <tbody>
+      {% for peer in user.peers %}
+      <tr>
+        <td>{{ peer.node.display_name }}</td>
+        <td>{{ peer.client_address }}</td>
+        <td class="mono">{{ peer.public_key }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<section class="panel" style="margin-top: 18px;">
+  <h2>流量明细</h2>
+  <table>
+    <thead><tr><th>日期</th><th>节点</th><th>下行</th><th>上行</th><th>合计</th><th>最近握手</th></tr></thead>
+    <tbody>
+      {% for row in summaries %}
+      <tr>
+        <td>{{ row.traffic_date }}</td>
+        <td>{{ row.node_name }}</td>
+        <td>{{ row.rx_bytes|filesize }}</td>
+        <td>{{ row.tx_bytes|filesize }}</td>
+        <td>{{ row.total_bytes|filesize }}</td>
+        <td>{{ row.latest_handshake_at|datetime }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">暂无流量记录</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
+

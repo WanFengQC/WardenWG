@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -32,7 +34,9 @@ class UserService:
         db.add(user)
         db.flush()
 
-        nodes = db.scalars(select(Node).where(Node.is_active.is_(True)).order_by(Node.sort_order)).all()
+        nodes = db.scalars(
+            select(Node).where(Node.is_active.is_(True)).order_by(Node.sort_order)
+        ).all()
         if not nodes:
             raise ValueError("没有可用节点，请先初始化节点信息")
 
@@ -74,11 +78,15 @@ class UserService:
         return user
 
     def list_users(self, db: Session) -> list[User]:
-        return db.scalars(
-            select(User)
-            .options(joinedload(User.peers).joinedload(Peer.node))
-            .order_by(User.id.desc())
-        ).unique().all()
+        return (
+            db.scalars(
+                select(User)
+                .options(joinedload(User.peers).joinedload(Peer.node))
+                .order_by(User.id.desc())
+            )
+            .unique()
+            .all()
+        )
 
     def set_user_status(self, db: Session, user_id: int, is_active: bool) -> User:
         user = self.get_user_by_id(db, user_id)
@@ -94,3 +102,4 @@ class UserService:
             raise ValueError("用户已过期")
         if user.total_quota_bytes is not None and user.used_bytes >= user.total_quota_bytes:
             raise ValueError("用户流量已耗尽")
+

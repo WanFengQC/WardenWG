@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}用户前台登录{% endblock %}
+{% block content %}
+<div class="auth-wrap panel">
+  <h1>用户前台</h1>
+  <p class="muted">输入你的订阅令牌，查看专属订阅地址和流量使用情况。</p>
+  <form method="post" action="/portal/login" class="grid">
+    <label>
+      <div>订阅令牌</div>
+      <input type="text" name="token" placeholder="输入 subscription_token" required>
+    </label>
+    <button type="submit">进入前台</button>
+  </form>
+  {% if error %}
+  <div class="notice">{{ error }}</div>
+  {% endif %}
+</div>
+{% endblock %}
+
