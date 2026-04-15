@@ -172,6 +172,18 @@ class UserService:
         db.flush()
         return device
 
+    def delete_device(self, db: Session, user_id: int, device_id: int) -> None:
+        device = db.scalar(select(Device).where(Device.id == device_id, Device.user_id == user_id))
+        if device is None:
+            raise ValueError("设备不存在")
+        db.delete(device)
+        db.flush()
+
+    def delete_user(self, db: Session, user_id: int) -> None:
+        user = self.get_user_by_id(db, user_id)
+        db.delete(user)
+        db.flush()
+
     def validate_device_subscription(self, device: Device) -> None:
         if not device.user.is_active:
             raise ValueError("用户已禁用")

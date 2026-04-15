@@ -6,13 +6,14 @@ from secrets import token_urlsafe
 from fastapi import APIRouter, Depends, Form, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.database import get_db
 from app.models.node import Node
 from app.models.user import User
+from app.models.web_account import WebAccount
 from app.schemas.user import DeviceCreate, UserCreate
 from app.services.node_sync import NodeSyncService
 from app.services.sessions import session_store
@@ -266,6 +267,20 @@ def admin_toggle_user(user_id: int, request: Request, db: Session = Depends(get_
     return _redirect("/admin")
 
 
+@router.post("/admin/users/{user_id}/delete")
+def admin_delete_user(user_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
+    if not _get_admin_session(request):
+        return _redirect("/admin/login")
+    try:
+        user_service.delete_user(db, user_id)
+        db.execute(delete(WebAccount).where(WebAccount.user_id == user_id))
+        db.commit()
+        return _redirect("/admin")
+    except ValueError as exc:
+        db.rollback()
+        return _redirect(f"/admin?error={str(exc)}")
+
+
 @router.post("/admin/devices/{device_id}/toggle")
 def admin_toggle_device(device_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
@@ -381,6 +396,56 @@ def portal_create_device(
         )
         db.commit()
         return _redirect(f"/portal?device_id={created.id}")
+    except ValueError as exc:
+        db.rollback()
+        return _redirect(f"/portal?error={str(exc)}")
+
+
+@router.post("/portal/devices/{device_id}/delete")
+def portal_delete_device(
+    device_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    session_subject = _get_user_session(request)
+    if not session_subject:
+        return _redirect("/portal/login")
+    try:
+        seed_device = user_service.get_device_by_token(db, session_subject)
+        user_service.validate_device_subscription(seed_device)
+        user = user_service.get_user_by_id(db, seed_device.user_id)
+        if len(user.devices) <= 1:
+            return _redirect("/portal?error=至少保留一台设备")
+        target = next((item for item in user.devices if item.id == device_id), None)
+        if target is None:
+            return _redirect("/portal?error=设备不存在")
+        deleting_session_device = seed_device.id == target.id
+        user_service.delete_device(db, user.id, target.id)
+        db.commit()
+
+        if deleting_session_device:
+            refreshed_user = user_service.get_user_by_id(db, user.id)
+            replacement = next((item for item in refreshed_user.devices if item.is_active), None)
+            if replacement is None and refreshed_user.devices:
+                replacement = refreshed_user.devices[0]
+            if replacement is None:
+                session_store.delete(request.cookies.get(USER_COOKIE))
+                response = _redirect("/portal/login")
+                response.delete_cookie(USER_COOKIE)
+                return response
+            session_store.delete(request.cookies.get(USER_COOKIE))
+            new_token = session_store.create(subject=replacement.subscription_token, role="user")
+            response = _redirect(f"/portal?device_id={replacement.id}")
+            response.set_cookie(
+                USER_COOKIE,
+                new_token,
+                httponly=True,
+                samesite="lax",
+                secure=settings.app_env == "prod",
+                max_age=43200,
+            )
+            return response
+        return _redirect("/portal")
     except ValueError as exc:
         db.rollback()
         return _redirect(f"/portal?error={str(exc)}")

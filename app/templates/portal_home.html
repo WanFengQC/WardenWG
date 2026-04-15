@@ -49,6 +49,11 @@
         </div>
         <div class="inline-actions" style="margin-top:10px;">
           <a class="button alt" href="/portal?device_id={{ item.id }}">查看详情</a>
+          {% if devices|length > 1 %}
+          <form method="post" action="/portal/devices/{{ item.id }}/delete" onsubmit="return confirm('确认删除设备 {{ item.name }}？');">
+            <button class="danger" type="submit">删除设备</button>
+          </form>
+          {% endif %}
         </div>
       </div>
       {% endfor %}

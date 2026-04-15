@@ -128,6 +128,9 @@
             <form method="post" action="/admin/users/{{ user.id }}/toggle">
               <button class="alt" type="submit">{{ "禁用" if user.is_active else "启用" }}</button>
             </form>
+            <form method="post" action="/admin/users/{{ user.id }}/delete" onsubmit="return confirm('确认删除用户 {{ user.username }} 及其全部设备？');">
+              <button class="danger" type="submit">删除用户</button>
+            </form>
           </div>
         </td>
       </tr>
