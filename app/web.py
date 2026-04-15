@@ -153,7 +153,7 @@ def admin_login(
     return response
 
 
-@router.post(f"{ADMIN_BASE_PATH}/logout")
+@router.post(ADMIN_BASE_PATH + "/logout")
 def admin_logout(request: Request) -> RedirectResponse:
     session_store.delete(request.cookies.get(ADMIN_COOKIE))
     response = _redirect(ADMIN_LOGIN_PATH)
@@ -189,7 +189,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)) -> Response
     )
 
 
-@router.post(f"{ADMIN_BASE_PATH}/users")
+@router.post(ADMIN_BASE_PATH + "/users")
 def admin_create_user(
     request: Request,
     username: str = Form(...),
@@ -231,7 +231,7 @@ def admin_create_user(
         return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post(f"{ADMIN_BASE_PATH}/users/{user_id}/limits")
+@router.post(ADMIN_BASE_PATH + "/users/{user_id}/limits")
 def admin_update_user_limits(
     user_id: int,
     request: Request,
@@ -264,7 +264,7 @@ def admin_update_user_limits(
         return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post(f"{ADMIN_BASE_PATH}/users/{user_id}/devices")
+@router.post(ADMIN_BASE_PATH + "/users/{user_id}/devices")
 def admin_create_device(
     user_id: int,
     request: Request,
@@ -283,7 +283,7 @@ def admin_create_device(
         return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post(f"{ADMIN_BASE_PATH}/users/{user_id}/toggle")
+@router.post(ADMIN_BASE_PATH + "/users/{user_id}/toggle")
 def admin_toggle_user(user_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
         return _redirect(ADMIN_LOGIN_PATH)
@@ -298,7 +298,7 @@ def admin_toggle_user(user_id: int, request: Request, db: Session = Depends(get_
         return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post(f"{ADMIN_BASE_PATH}/users/{user_id}/delete")
+@router.post(ADMIN_BASE_PATH + "/users/{user_id}/delete")
 def admin_delete_user(user_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
         return _redirect(ADMIN_LOGIN_PATH)
@@ -313,7 +313,7 @@ def admin_delete_user(user_id: int, request: Request, db: Session = Depends(get_
         return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post(f"{ADMIN_BASE_PATH}/devices/{device_id}/toggle")
+@router.post(ADMIN_BASE_PATH + "/devices/{device_id}/toggle")
 def admin_toggle_device(device_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
         return _redirect(ADMIN_LOGIN_PATH)
@@ -328,7 +328,7 @@ def admin_toggle_device(device_id: int, request: Request, db: Session = Depends(
         return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post(f"{ADMIN_BASE_PATH}/devices/{device_id}/delete")
+@router.post(ADMIN_BASE_PATH + "/devices/{device_id}/delete")
 def admin_delete_device(device_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
         return _redirect(ADMIN_LOGIN_PATH)
@@ -344,7 +344,7 @@ def admin_delete_device(device_id: int, request: Request, db: Session = Depends(
         return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post(f"{ADMIN_BASE_PATH}/devices/{device_id}/rotate-token")
+@router.post(ADMIN_BASE_PATH + "/devices/{device_id}/rotate-token")
 def admin_rotate_device_token(device_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
         return _redirect(ADMIN_LOGIN_PATH)
@@ -354,7 +354,7 @@ def admin_rotate_device_token(device_id: int, request: Request, db: Session = De
     return _redirect(ADMIN_BASE_PATH)
 
 
-@router.post(f"{ADMIN_BASE_PATH}/tasks/collect-traffic")
+@router.post(ADMIN_BASE_PATH + "/tasks/collect-traffic")
 def admin_collect_traffic(request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
         return _redirect(ADMIN_LOGIN_PATH)
@@ -365,7 +365,7 @@ def admin_collect_traffic(request: Request, db: Session = Depends(get_db)) -> Re
     return _redirect(ADMIN_BASE_PATH)
 
 
-@router.post(f"{ADMIN_BASE_PATH}/tasks/sync-peers")
+@router.post(ADMIN_BASE_PATH + "/tasks/sync-peers")
 def admin_sync_peers(request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
         return _redirect(ADMIN_LOGIN_PATH)
