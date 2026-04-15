@@ -17,7 +17,7 @@ from app.models.web_account import WebAccount
 from app.schemas.user import DeviceCreate, UserCreate
 from app.services.node_sync import NodeSyncService
 from app.services.sessions import session_store
-from app.services.node_meta import node_code, node_compact_name, node_region
+from app.services.node_meta import node_code, node_compact_name, node_region, node_short_label_from_name
 from app.services.traffic import TrafficCollectorService
 from app.services.traffic_queries import get_device_traffic_rows
 from app.services.users import UserService
@@ -51,7 +51,7 @@ def _format_date_utc(value: datetime | None) -> str:
         return "-"
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc).strftime("%Y%m%d")
+    return value.astimezone(timezone.utc).strftime("%Y-%m-%d")
 
 
 def _format_datetime_seconds_utc(value: datetime | None) -> str:
@@ -545,7 +545,7 @@ def portal_home(
         summaries = [
             {
                 "traffic_date": summary.traffic_date,
-                "node_name": node_name,
+                "node_name": node_short_label_from_name(node_name),
                 "rx_bytes": summary.rx_bytes,
                 "tx_bytes": summary.tx_bytes,
                 "total_bytes": summary.total_bytes,
@@ -560,7 +560,7 @@ def portal_home(
         device_summaries[item.id] = [
             {
                 "traffic_date": summary.traffic_date,
-                "node_name": node_name,
+                "node_name": node_short_label_from_name(node_name),
                 "rx_bytes": summary.rx_bytes,
                 "tx_bytes": summary.tx_bytes,
                 "total_bytes": summary.total_bytes,

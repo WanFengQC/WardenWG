@@ -20,3 +20,9 @@ def node_code(node: Node) -> str:
 
 def node_compact_name(node: Node, username: str, device_name: str) -> str:
     return f"{node_region(node)}{node_code(node)}-{username}-{device_name}"
+
+
+def node_short_label_from_name(node_name: str) -> str:
+    region = NODE_REGION_MAP.get(node_name, "未知")
+    code = node_name.split("-")[-1] if "-" in node_name else node_name
+    return f"{region}-{code}"
