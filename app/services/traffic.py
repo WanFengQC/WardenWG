@@ -26,6 +26,13 @@ class DumpPeerRecord:
 
 
 class TrafficCollectorService:
+    def _normalize_dt(self, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value
+        return value.astimezone(UTC).replace(tzinfo=None)
+
     def _parse_dump(self, content: str) -> list[DumpPeerRecord]:
         rows = []
         for line in content.splitlines():
@@ -34,7 +41,7 @@ class TrafficCollectorService:
                 continue
             handshake = None
             if columns[4] and columns[4] != "0":
-                handshake = datetime.fromtimestamp(int(columns[4]), tz=UTC)
+                handshake = self._normalize_dt(datetime.fromtimestamp(int(columns[4]), tz=UTC))
             rows.append(
                 DumpPeerRecord(
                     public_key=columns[0],
@@ -134,7 +141,9 @@ class TrafficCollectorService:
         summary.rx_bytes += delta_rx
         summary.tx_bytes += delta_tx
         summary.total_bytes = summary.rx_bytes + summary.tx_bytes
-        if handshake_at and (summary.latest_handshake_at is None or handshake_at > summary.latest_handshake_at):
-            summary.latest_handshake_at = handshake_at
+        normalized_handshake = self._normalize_dt(handshake_at)
+        summary_handshake = self._normalize_dt(summary.latest_handshake_at)
+        if normalized_handshake and (summary_handshake is None or normalized_handshake > summary_handshake):
+            summary.latest_handshake_at = normalized_handshake
         peer.user.used_bytes += delta_rx + delta_tx
         peer.device.used_bytes += delta_rx + delta_tx
