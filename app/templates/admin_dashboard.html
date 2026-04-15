@@ -86,9 +86,8 @@
         </td>
         <td>{{ user.used_bytes|filesize }}</td>
         <td>
-          <div class="muted">共 {{ user.devices|length }} 台设备</div>
           <div class="inline-actions" style="margin-top:8px;">
-            <a class="button alt" href="#user-devices-{{ user.id }}">查看设备</a>
+            <a class="button alt" href="#user-devices-{{ user.id }}">查看{{ user.devices|length }}台设备</a>
           </div>
         </td>
         <td>
