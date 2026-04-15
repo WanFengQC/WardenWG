@@ -133,10 +133,18 @@ class WebAuthService:
             return AuthResult(ok=False, reason="invalid_credentials")
 
         user = account.user
+        now = datetime.now(UTC).replace(tzinfo=None)
+        if not user.is_active:
+            return AuthResult(ok=False, reason="device_not_available")
+        if user.expires_at and user.expires_at < now:
+            return AuthResult(ok=False, reason="device_not_available")
+        if user.total_quota_bytes is not None and user.used_bytes >= user.total_quota_bytes:
+            return AuthResult(ok=False, reason="device_not_available")
+
         devices = sorted(user.devices, key=lambda item: item.id)
         active_device = next((item for item in devices if item.is_active), None)
         if active_device is None:
-            return AuthResult(ok=False, reason="device_not_available")
+            return AuthResult(ok=True, account=account, user=user, device=None)
         try:
             self.user_service.validate_device_subscription(active_device)
         except ValueError:

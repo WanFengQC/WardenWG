@@ -374,6 +374,19 @@ def admin_sync_peers(request: Request, db: Session = Depends(get_db)) -> Redirec
     return _redirect(ADMIN_BASE_PATH)
 
 
+def _get_portal_user_from_session(db: Session, session_subject: str | None) -> User | None:
+    if not session_subject:
+        return None
+    user_id = db.scalar(select(User.id).where(User.username == session_subject))
+    if user_id is not None:
+        return user_service.get_user_by_id(db, user_id)
+    try:
+        seed_device = user_service.get_device_by_token(db, session_subject)
+    except ValueError:
+        return None
+    return user_service.get_user_by_id(db, seed_device.user_id)
+
+
 @router.get("/portal/login")
 def portal_login_page(request: Request) -> Response:
     return templates.TemplateResponse(request, "portal_login.html", {"error": None})
@@ -391,24 +404,24 @@ def portal_login(
         return templates.TemplateResponse(
             request,
             "portal_login.html",
-            {"error": "用户名或密码错误"},
+            {"error": "????????"},
             status_code=400,
         )
 
     result = web_auth_service.authenticate_user(db, username.strip(), password)
-    if not result.ok or result.device is None:
+    if not result.ok:
         web_auth_service.record_failed_login(db, client_ip)
         db.commit()
         return templates.TemplateResponse(
             request,
             "portal_login.html",
-            {"error": "用户名或密码错误"},
+            {"error": "????????"},
             status_code=400,
         )
 
     web_auth_service.clear_failed_login(db, client_ip)
     db.commit()
-    session_token = session_store.create(subject=result.device.subscription_token, role="user")
+    session_token = session_store.create(subject=result.user.username if result.user else username.strip(), role="user")
     response = _redirect("/portal")
     response.set_cookie(
         USER_COOKIE,
@@ -437,14 +450,13 @@ def portal_create_device(
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
     session_subject = _get_user_session(request)
-    if not session_subject:
+    user = _get_portal_user_from_session(db, session_subject)
+    if user is None:
         return _redirect("/portal/login")
     try:
-        device = user_service.get_device_by_token(db, session_subject)
-        user_service.validate_device_subscription(device)
         created = user_service.create_device(
             db,
-            device.user_id,
+            user.id,
             DeviceCreate(name=name.strip(), remark=remark.strip() or None),
         )
         db.commit()
@@ -464,30 +476,29 @@ def portal_delete_device(
     if not session_subject:
         return _redirect("/portal/login")
     try:
-        seed_device = user_service.get_device_by_token(db, session_subject)
-        user_service.validate_device_subscription(seed_device)
-        user = user_service.get_user_by_id(db, seed_device.user_id)
+        user = _get_portal_user_from_session(db, session_subject)
+        if user is None:
+            return _redirect("/portal/login")
+
+        seed_device = None
+        try:
+            seed_device = user_service.get_device_by_token(db, session_subject)
+        except ValueError:
+            seed_device = None
+
         target = next((item for item in user.devices if item.id == device_id), None)
         if target is None:
-            return _redirect("/portal?error=设备不存在")
-        deleting_session_device = seed_device.id == target.id
+            return _redirect("/portal?error=?????")
+
+        deleting_session_device = bool(seed_device and seed_device.id == target.id)
         user_service.delete_device(db, user.id, target.id)
         node_sync_service.sync_all_nodes(db)
         db.commit()
 
         if deleting_session_device:
-            refreshed_user = user_service.get_user_by_id(db, user.id)
-            replacement = next((item for item in refreshed_user.devices if item.is_active), None)
-            if replacement is None and refreshed_user.devices:
-                replacement = refreshed_user.devices[0]
-            if replacement is None:
-                session_store.delete(request.cookies.get(USER_COOKIE))
-                response = _redirect("/portal/login")
-                response.delete_cookie(USER_COOKIE)
-                return response
             session_store.delete(request.cookies.get(USER_COOKIE))
-            new_token = session_store.create(subject=replacement.subscription_token, role="user")
-            response = _redirect(f"/portal?device_id={replacement.id}")
+            new_token = session_store.create(subject=user.username, role="user")
+            response = _redirect("/portal")
             response.set_cookie(
                 USER_COOKIE,
                 new_token,
@@ -514,7 +525,7 @@ def portal_home(
         try:
             device = user_service.get_device_by_token(db, token)
             user_service.validate_device_subscription(device)
-            session_token = session_store.create(subject=device.subscription_token, role="user")
+            session_token = session_store.create(subject=device.user.username, role="user")
             response = _redirect("/portal")
             response.set_cookie(
                 USER_COOKIE,
@@ -532,14 +543,11 @@ def portal_home(
     if not session_subject:
         return _redirect("/portal/login")
 
-    try:
-        seed_device = user_service.get_device_by_token(db, session_subject)
-        user_service.validate_device_subscription(seed_device)
-    except ValueError:
+    user = _get_portal_user_from_session(db, session_subject)
+    if user is None:
         session_store.delete(request.cookies.get(USER_COOKIE))
         return _redirect("/portal/login")
 
-    user = user_service.get_user_by_id(db, seed_device.user_id)
     devices = sorted(user.devices, key=lambda item: item.id)
     current_device = next((item for item in devices if item.id == device_id), None) if device_id else None
     show_device_detail = current_device is not None
@@ -590,4 +598,3 @@ def portal_home(
             "portal_error": request.query_params.get("error"),
         },
     )
-
