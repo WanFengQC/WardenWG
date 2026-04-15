@@ -17,6 +17,7 @@ from app.models.web_account import WebAccount
 from app.schemas.user import DeviceCreate, UserCreate
 from app.services.node_sync import NodeSyncService
 from app.services.sessions import session_store
+from app.services.node_meta import node_display_with_region, node_flag, node_region
 from app.services.traffic import TrafficCollectorService
 from app.services.traffic_queries import get_device_traffic_rows
 from app.services.users import UserService
@@ -47,6 +48,9 @@ def _format_bytes(value: int) -> str:
 
 templates.env.filters["filesize"] = _format_bytes
 templates.env.filters["datetime"] = lambda value: value.strftime("%Y-%m-%d %H:%M:%S") if value else "-"
+templates.env.globals["node_display_with_region"] = node_display_with_region
+templates.env.globals["node_region"] = node_region
+templates.env.globals["node_flag"] = node_flag
 
 
 def _get_admin_session(request: Request) -> str | None:
@@ -514,34 +518,36 @@ def portal_home(
         return _redirect("/portal/login")
 
     user = user_service.get_user_by_id(db, seed_device.user_id)
-    current_device = next((item for item in user.devices if item.id == device_id), None) if device_id else None
-    if current_device is None:
-        current_device = next((item for item in user.devices if item.is_active), None)
-    if current_device is None and user.devices:
-        current_device = user.devices[0]
-    if current_device is None:
-        return _redirect("/portal/login")
+    devices = sorted(user.devices, key=lambda item: item.id)
+    current_device = next((item for item in devices if item.id == device_id), None) if device_id else None
+    show_device_detail = current_device is not None
 
-    rows = get_device_traffic_rows(db, current_device.id)
-    summaries = [
-        {
-            "traffic_date": summary.traffic_date,
-            "node_name": node_name,
-            "rx_bytes": summary.rx_bytes,
-            "tx_bytes": summary.tx_bytes,
-            "total_bytes": summary.total_bytes,
-            "latest_handshake_at": summary.latest_handshake_at,
-        }
-        for summary, node_name in rows
-    ]
+    summaries = []
+    if current_device is not None:
+        rows = get_device_traffic_rows(db, current_device.id)
+        summaries = [
+            {
+                "traffic_date": summary.traffic_date,
+                "node_name": node_name,
+                "rx_bytes": summary.rx_bytes,
+                "tx_bytes": summary.tx_bytes,
+                "total_bytes": summary.total_bytes,
+                "latest_handshake_at": summary.latest_handshake_at,
+            }
+            for summary, node_name in rows
+        ]
+
+    total_used_bytes = sum(item.used_bytes for item in devices)
     return templates.TemplateResponse(
         request,
         "portal_home.html",
         {
             "user": user,
             "device": current_device,
-            "devices": sorted(user.devices, key=lambda item: item.id),
+            "devices": devices,
+            "show_device_detail": show_device_detail,
             "summaries": summaries,
+            "total_used_bytes": total_used_bytes,
             "subscription_base_url": settings.subscription_base_url,
             "portal_error": request.query_params.get("error"),
         },
