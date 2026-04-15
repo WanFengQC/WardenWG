@@ -341,3 +341,6 @@ package-lock.json
 package.json
 main/test
 logs/
+# local codex context
+/codex.md
+
