@@ -1,6 +1,12 @@
 ﻿{% extends "base.html" %}
 {% block title %}管理后台{% endblock %}
 {% block content %}
+<style>
+  .user-table th,
+  .user-table td {
+    vertical-align: middle;
+  }
+</style>
 <div class="hero">
   <div>
     <h1>WardenWG 管理后台</h1>
@@ -59,11 +65,12 @@
 
 <section class="panel" style="margin-top: 18px;">
   <h2>用户列表</h2>
-  <table>
+  <table class="user-table">
     <thead>
       <tr>
         <th>ID</th>
         <th>用户名</th>
+        <th>备注</th>
         <th>状态</th>
         <th>已用流量</th>
         <th>设备</th>
@@ -76,9 +83,9 @@
         <td>{{ user.id }}</td>
         <td>
           <strong>{{ user.username }}</strong><br>
-          <span class="muted">{{ user.remark or "-" }}</span><br>
           <span class="muted">设备上限 {{ user.device_limit }}，到期 {{ user.expires_at|datetime }}，配额 {{ user.total_quota_bytes|filesize if user.total_quota_bytes else "不限额" }}</span>
         </td>
+        <td class="muted">{{ user.remark or "-" }}</td>
         <td>
           <span class="status{% if not user.is_active %} off{% endif %}">
             {{ "启用" if user.is_active else "禁用" }}
