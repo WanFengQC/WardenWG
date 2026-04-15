@@ -65,6 +65,12 @@ def _redirect(url: str, status_code: int = status.HTTP_303_SEE_OTHER) -> Redirec
 
 
 def _client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for", "").strip()
+    if xff:
+        return xff.split(",")[0].strip()
+    xri = request.headers.get("x-real-ip", "").strip()
+    if xri:
+        return xri
     return request.client.host if request.client else "unknown"
 
 
