@@ -17,7 +17,7 @@ from app.models.web_account import WebAccount
 from app.schemas.user import DeviceCreate, UserCreate
 from app.services.node_sync import NodeSyncService
 from app.services.sessions import session_store
-from app.services.node_meta import node_display_with_region, node_flag, node_region
+from app.services.node_meta import node_code, node_compact_name, node_region
 from app.services.traffic import TrafficCollectorService
 from app.services.traffic_queries import get_device_traffic_rows
 from app.services.users import UserService
@@ -57,9 +57,9 @@ def _format_datetime_utc8(value: datetime | None) -> str:
 
 templates.env.filters["filesize"] = _format_bytes
 templates.env.filters["datetime"] = _format_datetime_utc8
-templates.env.globals["node_display_with_region"] = node_display_with_region
+templates.env.globals["node_compact_name"] = node_compact_name
 templates.env.globals["node_region"] = node_region
-templates.env.globals["node_flag"] = node_flag
+templates.env.globals["node_code"] = node_code
 
 
 def _get_admin_session(request: Request) -> str | None:

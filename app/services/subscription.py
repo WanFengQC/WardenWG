@@ -4,13 +4,13 @@ from jinja2 import Environment, FileSystemLoader
 
 from app.core.config import get_settings
 from app.models.device import Device
-from app.services.node_meta import node_display_with_region, node_flag, node_region
+from app.services.node_meta import node_code, node_compact_name, node_region
 
 settings = get_settings()
 jinja_env = Environment(loader=FileSystemLoader(str(settings.template_dir)), autoescape=False)
-jinja_env.globals["node_display_with_region"] = node_display_with_region
+jinja_env.globals["node_compact_name"] = node_compact_name
 jinja_env.globals["node_region"] = node_region
-jinja_env.globals["node_flag"] = node_flag
+jinja_env.globals["node_code"] = node_code
 
 
 class SubscriptionService:

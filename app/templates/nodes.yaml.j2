@@ -1,6 +1,6 @@
 proxies:
 {% for peer in peers %}
-  - name: "{{ user.username }}-{{ device.name }}-{{ node_display_with_region(peer.node) }}"
+  - name: "{{ node_compact_name(peer.node, user.username, device.name) }}"
     type: wireguard
     ip: {{ peer.client_address }}
     private-key: {{ peer.private_key }}

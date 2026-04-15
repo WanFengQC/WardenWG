@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     timezone: str = "UTC"
     manager_base_url: str = "https://sub.example.com"
     subscription_base_url: str = "https://sub.example.com"
-    subscription_display_name: str = "WardenWG"
+    subscription_display_name: str = "WFQC8"
     api_prefix: str = "/api/v1"
     admin_api_key: str = "change-me"
     wg_config_name: str = "wg0"

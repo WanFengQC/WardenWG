@@ -70,9 +70,6 @@
             导入到 Clash
           </button>
           <a class="button alt" href="#device-modal-{{ item.id }}">查看设备</a>
-          <form method="post" action="/portal/devices/{{ item.id }}/delete" onsubmit="return confirm('确认删除设备 {{ item.name }}？');">
-            <button class="danger" type="submit">删除设备</button>
-          </form>
         </div>
       </div>
       {% endfor %}
@@ -87,7 +84,7 @@
       <tbody>
       {% for peer in device.peers %}
       <tr>
-        <td>{{ user.username }}-{{ device.name }}-{{ node_display_with_region(peer.node) }}</td>
+        <td>{{ node_compact_name(peer.node, user.username, device.name) }}</td>
         <td>{{ peer.client_address }}</td>
         <td class="mono">{{ peer.public_key }}</td>
       </tr>
@@ -120,7 +117,12 @@
   <div class="modal-card">
     <div class="modal-header">
       <h2 style="margin:0;">设备详情（{{ item.name }}）</h2>
-      <a class="button alt" href="#">关闭</a>
+      <div class="inline-actions">
+        <form method="post" action="/portal/devices/{{ item.id }}/delete" onsubmit="return confirm('确认删除设备 {{ item.name }}？');">
+          <button class="danger" type="submit">删除设备</button>
+        </form>
+        <a class="button alt" href="#">关闭</a>
+      </div>
     </div>
     <section class="panel" style="padding:14px;">
       <h3 style="margin:0 0 10px;">节点信息</h3>
@@ -129,7 +131,7 @@
         <tbody>
         {% for peer in item.peers %}
         <tr>
-          <td>{{ user.username }}-{{ item.name }}-{{ node_display_with_region(peer.node) }}</td>
+          <td>{{ node_compact_name(peer.node, user.username, item.name) }}</td>
           <td>{{ peer.client_address }}</td>
           <td class="mono">{{ peer.public_key }}</td>
         </tr>
