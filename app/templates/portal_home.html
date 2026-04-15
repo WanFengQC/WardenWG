@@ -1,34 +1,61 @@
-{% extends "base.html" %}
-{% block title %}用户前台{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}设备管理{% endblock %}
 {% block content %}
 <div class="hero">
   <div>
-    <h1>{{ user.username }} / {{ device.name }}</h1>
-    <p>当前展示的是设备级订阅和设备级流量统计。每台设备使用独立 Peer，可同时在线。</p>
+    <h1>{{ user.username }} / 设备管理</h1>
+    <p>这里展示该账号下全部设备。可切换设备查看节点和流量，并在上限内新增设备。</p>
   </div>
   <div class="toolbar">
+    <a class="button" href="#create-device">新建设备</a>
     <form method="post" action="/portal/logout"><button class="danger" type="submit">退出</button></form>
   </div>
 </div>
 
+{% if portal_error %}
+<section class="panel" style="margin-bottom: 18px;">
+  <div class="notice">{{ portal_error }}</div>
+</section>
+{% endif %}
+
 <div class="grid cards">
   <section class="panel"><div class="muted">用户状态</div><div class="card-number">{{ "正常" if user.is_active else "禁用" }}</div></section>
-  <section class="panel"><div class="muted">设备状态</div><div class="card-number">{{ "正常" if device.is_active else "禁用" }}</div></section>
-  <section class="panel"><div class="muted">设备用量</div><div class="card-number">{{ device.used_bytes|filesize }}</div></section>
+  <section class="panel"><div class="muted">设备数量</div><div class="card-number">{{ devices|length }} / {{ user.device_limit }}</div></section>
+  <section class="panel"><div class="muted">当前设备</div><div class="card-number" style="font-size:22px">{{ device.name }}</div></section>
+  <section class="panel"><div class="muted">当前设备用量</div><div class="card-number">{{ device.used_bytes|filesize }}</div></section>
   <section class="panel"><div class="muted">到期时间</div><div class="card-number" style="font-size:20px">{{ user.expires_at|datetime }}</div></section>
   <section class="panel"><div class="muted">配额</div><div class="card-number" style="font-size:20px">{{ user.total_quota_bytes|filesize if user.total_quota_bytes else "不限额" }}</div></section>
 </div>
 
 <div class="split" style="margin-top: 18px;">
   <section class="panel">
-    <h2>订阅链接</h2>
-    <div class="links">
-      <a class="link-box mono" href="{{ main_yaml_url }}" target="_blank">{{ main_yaml_url }}</a>
-      <a class="link-box mono" href="{{ nodes_yaml_url }}" target="_blank">{{ nodes_yaml_url }}</a>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <h2 style="margin:0;">设备管理</h2>
+      <a class="button alt" href="#create-device">新建设备</a>
+    </div>
+    <div class="device-list" style="margin-top:12px;">
+      {% for item in devices %}
+      <div class="device-item">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;">
+          <div>
+            <strong>{{ item.name }}</strong>
+            <span class="status{% if not item.is_active %} off{% endif %}" style="margin-left:8px;">{{ "启用" if item.is_active else "禁用" }}</span>
+          </div>
+          <div class="muted">{{ item.used_bytes|filesize }}</div>
+        </div>
+        <div class="links" style="margin-top:10px;">
+          <a class="link-box mono" href="{{ subscription_base_url }}/sub/{{ item.subscription_token }}/main.yaml" target="_blank">{{ subscription_base_url }}/sub/{{ item.subscription_token }}/main.yaml</a>
+          <a class="link-box mono" href="{{ subscription_base_url }}/sub/{{ item.subscription_token }}/nodes.yaml" target="_blank">{{ subscription_base_url }}/sub/{{ item.subscription_token }}/nodes.yaml</a>
+        </div>
+        <div class="inline-actions" style="margin-top:10px;">
+          <a class="button alt" href="/portal?device_id={{ item.id }}">查看详情</a>
+        </div>
+      </div>
+      {% endfor %}
     </div>
   </section>
   <section class="panel">
-    <h2>节点信息</h2>
+    <h2>节点信息（{{ device.name }}）</h2>
     <table>
       <thead><tr><th>节点</th><th>地址</th><th>公钥</th></tr></thead>
       <tbody>
@@ -45,7 +72,7 @@
 </div>
 
 <section class="panel" style="margin-top: 18px;">
-  <h2>流量明细</h2>
+  <h2>流量明细（{{ device.name }}）</h2>
   <table>
     <thead><tr><th>日期</th><th>节点</th><th>下行</th><th>上行</th><th>合计</th><th>最近握手</th></tr></thead>
     <tbody>
@@ -64,4 +91,22 @@
     </tbody>
   </table>
 </section>
+
+<div id="create-device" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 style="margin:0;">新建设备</h2>
+      <a class="button alt" href="/portal">关闭</a>
+    </div>
+    <p class="muted" style="margin-top:0;">当前可创建上限：{{ user.device_limit }} 台，已创建 {{ devices|length }} 台。</p>
+    <form method="post" action="/portal/devices" class="grid">
+      <label><div>设备名</div><input name="name" required placeholder="例如 ipad"></label>
+      <label><div>备注</div><input name="remark" placeholder="可选"></label>
+      <button type="submit" {% if devices|length >= user.device_limit %}disabled{% endif %}>确认创建</button>
+    </form>
+    {% if devices|length >= user.device_limit %}
+    <div class="notice">已达到设备上限，请联系管理员调整。</div>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

@@ -169,6 +169,7 @@ def admin_create_user(
     initial_device_name: str = Form(default="default"),
     remark: str = Form(default=""),
     total_quota_gb: str = Form(default=""),
+    device_limit: str = Form(default="5"),
     expires_at: str = Form(default=""),
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
@@ -178,6 +179,9 @@ def admin_create_user(
         quota_bytes = None
         if total_quota_gb.strip():
             quota_bytes = int(float(total_quota_gb) * 1024 * 1024 * 1024)
+        limit = 5
+        if device_limit.strip():
+            limit = int(device_limit)
         expire_dt = None
         if expires_at.strip():
             expire_dt = datetime.fromisoformat(expires_at)
@@ -189,8 +193,42 @@ def admin_create_user(
                 initial_device_name=initial_device_name.strip() or "default",
                 remark=remark.strip() or None,
                 total_quota_bytes=quota_bytes,
+                device_limit=limit,
                 expires_at=expire_dt,
             ),
+        )
+        db.commit()
+        return _redirect("/admin")
+    except ValueError as exc:
+        db.rollback()
+        return _redirect(f"/admin?error={str(exc)}")
+
+
+@router.post("/admin/users/{user_id}/limits")
+def admin_update_user_limits(
+    user_id: int,
+    request: Request,
+    device_limit: str = Form(default="5"),
+    total_quota_gb: str = Form(default=""),
+    expires_at: str = Form(default=""),
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    if not _get_admin_session(request):
+        return _redirect("/admin/login")
+    try:
+        limit = int(device_limit.strip() or "5")
+        quota_bytes = None
+        if total_quota_gb.strip():
+            quota_bytes = int(float(total_quota_gb) * 1024 * 1024 * 1024)
+        expire_dt = None
+        if expires_at.strip():
+            expire_dt = datetime.fromisoformat(expires_at)
+        user_service.update_user_limits(
+            db,
+            user_id,
+            device_limit=limit,
+            expires_at=expire_dt,
+            total_quota_bytes=quota_bytes,
         )
         db.commit()
         return _redirect("/admin")
@@ -323,10 +361,36 @@ def portal_logout(request: Request) -> RedirectResponse:
     return response
 
 
+@router.post("/portal/devices")
+def portal_create_device(
+    request: Request,
+    name: str = Form(...),
+    remark: str = Form(default=""),
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    session_subject = _get_user_session(request)
+    if not session_subject:
+        return _redirect("/portal/login")
+    try:
+        device = user_service.get_device_by_token(db, session_subject)
+        user_service.validate_device_subscription(device)
+        created = user_service.create_device(
+            db,
+            device.user_id,
+            DeviceCreate(name=name.strip(), remark=remark.strip() or None),
+        )
+        db.commit()
+        return _redirect(f"/portal?device_id={created.id}")
+    except ValueError as exc:
+        db.rollback()
+        return _redirect(f"/portal?error={str(exc)}")
+
+
 @router.get("/portal")
 def portal_home(
     request: Request,
     token: str | None = Query(default=None),
+    device_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> Response:
     if token:
@@ -352,13 +416,22 @@ def portal_home(
         return _redirect("/portal/login")
 
     try:
-        device = user_service.get_device_by_token(db, session_subject)
-        user_service.validate_device_subscription(device)
+        seed_device = user_service.get_device_by_token(db, session_subject)
+        user_service.validate_device_subscription(seed_device)
     except ValueError:
         session_store.delete(request.cookies.get(USER_COOKIE))
         return _redirect("/portal/login")
 
-    rows = get_device_traffic_rows(db, device.id)
+    user = user_service.get_user_by_id(db, seed_device.user_id)
+    current_device = next((item for item in user.devices if item.id == device_id), None) if device_id else None
+    if current_device is None:
+        current_device = next((item for item in user.devices if item.is_active), None)
+    if current_device is None and user.devices:
+        current_device = user.devices[0]
+    if current_device is None:
+        return _redirect("/portal/login")
+
+    rows = get_device_traffic_rows(db, current_device.id)
     summaries = [
         {
             "traffic_date": summary.traffic_date,
@@ -374,10 +447,11 @@ def portal_home(
         request,
         "portal_home.html",
         {
-            "user": device.user,
-            "device": device,
+            "user": user,
+            "device": current_device,
+            "devices": sorted(user.devices, key=lambda item: item.id),
             "summaries": summaries,
-            "main_yaml_url": f"{settings.subscription_base_url}/sub/{device.subscription_token}/main.yaml",
-            "nodes_yaml_url": f"{settings.subscription_base_url}/sub/{device.subscription_token}/nodes.yaml",
+            "subscription_base_url": settings.subscription_base_url,
+            "portal_error": request.query_params.get("error"),
         },
     )

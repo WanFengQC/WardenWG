@@ -53,6 +53,7 @@ class UserService:
             is_active=True,
             expires_at=payload.expires_at,
             total_quota_bytes=payload.total_quota_bytes,
+            device_limit=payload.device_limit or 5,
             remark=payload.remark,
         )
         db.add(user)
@@ -73,6 +74,8 @@ class UserService:
 
     def create_device(self, db: Session, user_id: int, payload: DeviceCreate) -> Device:
         user = self.get_user_by_id(db, user_id)
+        if len(user.devices) >= user.device_limit:
+            raise ValueError(f"设备数量已达上限（{user.device_limit}）")
         exists = db.scalar(
             select(Device).where(Device.user_id == user_id, Device.name == payload.name)
         )
@@ -91,6 +94,28 @@ class UserService:
         self._build_device_peers(db, user, device)
         db.flush()
         return self.get_device_by_id(db, device.id)
+
+    def update_user_limits(
+        self,
+        db: Session,
+        user_id: int,
+        *,
+        device_limit: int,
+        expires_at: datetime | None,
+        total_quota_bytes: int | None,
+    ) -> User:
+        user = self.get_user_by_id(db, user_id)
+        if device_limit < 1:
+            raise ValueError("设备上限至少为 1")
+        current_devices = len(user.devices)
+        if device_limit < current_devices:
+            raise ValueError(f"设备上限不能小于当前设备数（{current_devices}）")
+        user.device_limit = device_limit
+        user.expires_at = expires_at
+        user.total_quota_bytes = total_quota_bytes
+        user.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        db.flush()
+        return user
 
     def get_user_by_id(self, db: Session, user_id: int) -> User:
         user = db.scalar(

@@ -10,6 +10,7 @@ class UserCreate(BaseModel):
     initial_device_name: str = Field(default="default", min_length=1, max_length=64)
     expires_at: datetime | None = None
     total_quota_bytes: int | None = None
+    device_limit: int = Field(default=5, ge=1, le=20)
     remark: str | None = None
 
 
@@ -51,6 +52,7 @@ class UserRead(BaseModel):
     is_active: bool
     expires_at: datetime | None = None
     total_quota_bytes: int | None = None
+    device_limit: int = 5
     used_bytes: int
     remark: str | None = None
     created_at: datetime

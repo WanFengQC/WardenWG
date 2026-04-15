@@ -1,10 +1,10 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}管理后台{% endblock %}
 {% block content %}
 <div class="hero">
   <div>
     <h1>WardenWG 管理后台</h1>
-    <p>管理用户、订阅、节点同步和流量采集。当前时间：{{ now.strftime("%Y-%m-%d %H:%M:%S") }}</p>
+    <p>管理用户、节点、设备与流量。当前时间：{{ now.strftime("%Y-%m-%d %H:%M:%S") }}</p>
   </div>
   <div class="toolbar">
     <form method="post" action="/admin/tasks/collect-traffic"><button class="alt" type="submit">立即采集流量</button></form>
@@ -32,10 +32,11 @@
     <form method="post" action="/admin/users" class="grid">
       <label><div>用户名</div><input name="username" required placeholder="例如 test002"></label>
       <label><div>首台设备名</div><input name="initial_device_name" value="default" required placeholder="例如 iphone"></label>
+      <label><div>设备上限</div><input name="device_limit" value="5" type="number" min="1" max="20" required></label>
       <label><div>到期时间</div><input type="datetime-local" name="expires_at"></label>
       <label><div>总流量配额（GB）</div><input name="total_quota_gb" placeholder="留空表示不限额"></label>
       <label><div>备注</div><textarea name="remark" placeholder="例如 月付测试用户"></textarea></label>
-      <button type="submit">创建用户并生成首台设备 Peer</button>
+      <button type="submit">创建用户并生成首台设备</button>
     </form>
   </section>
   <section class="panel">
@@ -75,7 +76,8 @@
         <td>{{ user.id }}</td>
         <td>
           <strong>{{ user.username }}</strong><br>
-          <span class="muted">{{ user.remark or "-" }}</span>
+          <span class="muted">{{ user.remark or "-" }}</span><br>
+          <span class="muted">设备上限 {{ user.device_limit }}，到期 {{ user.expires_at|datetime }}，配额 {{ user.total_quota_bytes|filesize if user.total_quota_bytes else "不限额" }}</span>
         </td>
         <td>
           <span class="status{% if not user.is_active %} off{% endif %}">
@@ -122,6 +124,7 @@
         </td>
         <td>
           <div class="inline-actions">
+            <a class="button alt" href="#user-limit-{{ user.id }}">限制设置</a>
             <form method="post" action="/admin/users/{{ user.id }}/toggle">
               <button class="alt" type="submit">{{ "禁用" if user.is_active else "启用" }}</button>
             </form>
@@ -132,4 +135,21 @@
     </tbody>
   </table>
 </section>
+
+{% for user in users %}
+<div id="user-limit-{{ user.id }}" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 style="margin:0;">{{ user.username }} 限制设置</h2>
+      <a class="button alt" href="/admin">关闭</a>
+    </div>
+    <form method="post" action="/admin/users/{{ user.id }}/limits" class="grid">
+      <label><div>设备上限</div><input name="device_limit" type="number" min="1" max="20" value="{{ user.device_limit }}" required></label>
+      <label><div>到期时间</div><input type="datetime-local" name="expires_at" value="{{ user.expires_at.strftime('%Y-%m-%dT%H:%M:%S') if user.expires_at else '' }}"></label>
+      <label><div>总流量配额（GB）</div><input name="total_quota_gb" value="{{ (user.total_quota_bytes / 1073741824) if user.total_quota_bytes else '' }}" placeholder="留空表示不限额"></label>
+      <button type="submit">保存</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
 {% endblock %}

@@ -15,6 +15,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     total_quota_bytes: Mapped[int | None] = mapped_column(nullable=True)
+    device_limit: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     used_bytes: Mapped[int] = mapped_column(default=0, nullable=False)
     remark: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from sqlalchemy import inspect, text
 
 from app.core.config import get_settings
 from app.db.database import Base, engine
@@ -15,9 +16,19 @@ from app.web import router as web_router
 settings = get_settings()
 
 
+def _ensure_compat_columns() -> None:
+    inspector = inspect(engine)
+    user_cols = {col["name"] for col in inspector.get_columns("users")}
+    if "device_limit" in user_cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN device_limit INTEGER NOT NULL DEFAULT 5"))
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _ensure_compat_columns()
     db = SessionLocal()
     try:
         WebAuthService(UserService()).ensure_default_accounts(db)
