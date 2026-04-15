@@ -18,10 +18,10 @@ dns:
     - 8.8.8.8
 
 proxy-providers:
-  wardenwg-nodes:
+  wardenwg-nodes-{{ device.subscription_token[:8] }}:
     type: http
     url: {{ nodes_url }}
-    path: ./providers/wardenwg-nodes.yaml
+    path: ./providers/wardenwg-nodes-{{ device.subscription_token[:8] }}.yaml
     interval: 3600
     health-check:
       enable: true
@@ -32,13 +32,13 @@ proxy-groups:
   - name: PROXY
     type: select
     use:
-      - wardenwg-nodes
+      - wardenwg-nodes-{{ device.subscription_token[:8] }}
     proxies:
       - DIRECT
   - name: AUTO
     type: url-test
     use:
-      - wardenwg-nodes
+      - wardenwg-nodes-{{ device.subscription_token[:8] }}
     url: https://cp.cloudflare.com/generate_204
     interval: 300
     tolerance: 100
