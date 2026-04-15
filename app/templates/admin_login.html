@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}管理员后台登录{% endblock %}
+{% block title %}管理员登录{% endblock %}
 {% block content %}
 <div class="auth-wrap panel">
   <h1>WardenWG 管理后台</h1>
   <p class="muted">使用管理员账号密码登录后台。</p>
-  <form method="post" action="/admin/login" class="grid">
+  <form method="post" action="{{ admin_base_path }}/login" class="grid">
     <label>
       <div>用户名</div>
       <input type="text" name="username" placeholder="输入管理员用户名" required>

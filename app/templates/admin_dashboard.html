@@ -13,9 +13,9 @@
     <p>管理用户、节点、设备与流量。当前时间：{{ now.strftime("%Y-%m-%d %H:%M:%S") }}</p>
   </div>
   <div class="toolbar">
-    <form method="post" action="/admin/tasks/collect-traffic"><button class="alt" type="submit">立即采集流量</button></form>
-    <form method="post" action="/admin/tasks/sync-peers"><button class="warn" type="submit">同步全部 Peer</button></form>
-    <form method="post" action="/admin/logout"><button class="danger" type="submit">退出登录</button></form>
+    <form method="post" action="{{ admin_base_path }}/tasks/collect-traffic"><button class="alt" type="submit">立即采集流量</button></form>
+    <form method="post" action="{{ admin_base_path }}/tasks/sync-peers"><button class="warn" type="submit">同步全部 Peer</button></form>
+    <form method="post" action="{{ admin_base_path }}/logout"><button class="danger" type="submit">退出登录</button></form>
   </div>
 </div>
 
@@ -35,7 +35,7 @@
 <div class="split" style="margin-top: 18px;">
   <section class="panel">
     <h2>创建用户</h2>
-    <form method="post" action="/admin/users" class="grid">
+    <form method="post" action="{{ admin_base_path }}/users" class="grid">
       <label><div>用户名</div><input name="username" required placeholder="例如 test002"></label>
       <label><div>首台设备名</div><input name="initial_device_name" value="default" required placeholder="例如 iphone"></label>
       <label><div>设备上限</div><input name="device_limit" value="5" type="number" min="1" max="20" required></label>
@@ -100,10 +100,10 @@
         <td>
           <div class="inline-actions">
             <a class="button alt" href="#user-limit-{{ user.id }}">限制设置</a>
-            <form method="post" action="/admin/users/{{ user.id }}/toggle">
+            <form method="post" action="{{ admin_base_path }}/users/{{ user.id }}/toggle">
               <button class="alt" type="submit">{{ "禁用" if user.is_active else "启用" }}</button>
             </form>
-            <form method="post" action="/admin/users/{{ user.id }}/delete" onsubmit="return confirm('确认删除用户 {{ user.username }} 及其全部设备？');">
+            <form method="post" action="{{ admin_base_path }}/users/{{ user.id }}/delete" onsubmit="return confirm('确认删除用户 {{ user.username }} 及其全部设备？');">
               <button class="danger" type="submit">删除用户</button>
             </form>
           </div>
@@ -119,9 +119,9 @@
   <div class="modal-card">
     <div class="modal-header">
       <h2 style="margin:0;">{{ user.username }} 限制设置</h2>
-      <a class="button alt" href="/admin">关闭</a>
+      <a class="button alt" href="{{ admin_base_path }}">关闭</a>
     </div>
-    <form method="post" action="/admin/users/{{ user.id }}/limits" class="grid">
+    <form method="post" action="{{ admin_base_path }}/users/{{ user.id }}/limits" class="grid">
       <label><div>设备上限</div><input name="device_limit" type="number" min="1" max="20" value="{{ user.device_limit }}" required></label>
       <label><div>到期时间</div><input type="datetime-local" name="expires_at" value="{{ user.expires_at.strftime('%Y-%m-%dT%H:%M:%S') if user.expires_at else '' }}"></label>
       <label><div>总流量配额（GB）</div><input name="total_quota_gb" value="{{ (user.total_quota_bytes / 1073741824) if user.total_quota_bytes else '' }}" placeholder="留空表示不限额"></label>
@@ -134,7 +134,7 @@
   <div class="modal-card">
     <div class="modal-header">
       <h2 style="margin:0;">{{ user.username }} 设备管理</h2>
-      <a class="button alt" href="/admin">关闭</a>
+      <a class="button alt" href="{{ admin_base_path }}">关闭</a>
     </div>
     {% for device in user.devices %}
     <div class="panel" style="padding: 14px; margin-bottom: 10px; border-radius: 16px; box-shadow: none;">
@@ -156,20 +156,20 @@
         {% endfor %}
       </div>
       <div class="inline-actions" style="margin-top:10px;">
-        <form method="post" action="/admin/devices/{{ device.id }}/toggle">
+        <form method="post" action="{{ admin_base_path }}/devices/{{ device.id }}/toggle">
           <button class="alt" type="submit">{{ "禁用设备" if device.is_active else "启用设备" }}</button>
         </form>
-        <form method="post" action="/admin/devices/{{ device.id }}/rotate-token">
+        <form method="post" action="{{ admin_base_path }}/devices/{{ device.id }}/rotate-token">
           <button class="warn" type="submit">轮换设备订阅</button>
         </form>
-        <form method="post" action="/admin/devices/{{ device.id }}/delete" onsubmit="return confirm('确认删除设备 {{ device.name }}？');">
+        <form method="post" action="{{ admin_base_path }}/devices/{{ device.id }}/delete" onsubmit="return confirm('确认删除设备 {{ device.name }}？');">
           <button class="danger" type="submit">删除设备</button>
         </form>
         <a class="button alt" href="/portal?token={{ device.subscription_token }}">设备前台</a>
       </div>
     </div>
     {% endfor %}
-    <form method="post" action="/admin/users/{{ user.id }}/devices" class="grid" style="margin-top:12px;">
+    <form method="post" action="{{ admin_base_path }}/users/{{ user.id }}/devices" class="grid" style="margin-top:12px;">
       <input name="name" placeholder="新增设备名，例如 ipad" required>
       <input name="remark" placeholder="设备备注，可选">
       <button type="submit">新增设备</button>
@@ -178,3 +178,4 @@
 </div>
 {% endfor %}
 {% endblock %}
+

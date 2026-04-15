@@ -34,6 +34,11 @@ node_sync_service = NodeSyncService()
 
 ADMIN_COOKIE = "wardenwg_admin_session"
 USER_COOKIE = "wardenwg_user_session"
+ADMIN_BASE_PATH = settings.admin_web_path.strip() or "/console"
+if not ADMIN_BASE_PATH.startswith("/"):
+    ADMIN_BASE_PATH = f"/{ADMIN_BASE_PATH}"
+ADMIN_BASE_PATH = ADMIN_BASE_PATH.rstrip("/") or "/console"
+ADMIN_LOGIN_PATH = f"{ADMIN_BASE_PATH}/login"
 
 
 def _format_bytes(value: int) -> str:
@@ -68,7 +73,7 @@ templates.env.filters["datetime_seconds"] = _format_datetime_seconds_utc
 templates.env.globals["node_compact_name"] = node_compact_name
 templates.env.globals["node_region"] = node_region
 templates.env.globals["node_code"] = node_code
-
+templates.env.globals["admin_base_path"] = ADMIN_BASE_PATH
 
 def _get_admin_session(request: Request) -> str | None:
     token = request.cookies.get(ADMIN_COOKIE)
@@ -98,15 +103,15 @@ def _client_ip(request: Request) -> str:
 
 @router.get("/")
 def index() -> RedirectResponse:
-    return _redirect("/admin")
+    return _redirect("/portal/login")
 
 
-@router.get("/admin/login")
+@router.get(ADMIN_LOGIN_PATH)
 def admin_login_page(request: Request) -> Response:
     return templates.TemplateResponse(request, "admin_login.html", {"error": None})
 
 
-@router.post("/admin/login")
+@router.post(ADMIN_LOGIN_PATH)
 def admin_login(
     request: Request,
     username: str = Form(default=""),
@@ -118,7 +123,7 @@ def admin_login(
         return templates.TemplateResponse(
             request,
             "admin_login.html",
-            {"error": "该 IP 登录失败次数过多，已被封禁"},
+            {"error": "用户名或密码错误"},
             status_code=403,
         )
 
@@ -136,7 +141,7 @@ def admin_login(
     web_auth_service.clear_failed_login(db, client_ip)
     db.commit()
     token = session_store.create(subject=result.account.username if result.account else "admin", role="admin")
-    response = _redirect("/admin")
+    response = _redirect(ADMIN_BASE_PATH)
     response.set_cookie(
         ADMIN_COOKIE,
         token,
@@ -148,18 +153,18 @@ def admin_login(
     return response
 
 
-@router.post("/admin/logout")
+@router.post(f"{ADMIN_BASE_PATH}/logout")
 def admin_logout(request: Request) -> RedirectResponse:
     session_store.delete(request.cookies.get(ADMIN_COOKIE))
-    response = _redirect("/admin/login")
+    response = _redirect(ADMIN_LOGIN_PATH)
     response.delete_cookie(ADMIN_COOKIE)
     return response
 
 
-@router.get("/admin")
+@router.get(ADMIN_BASE_PATH)
 def admin_dashboard(request: Request, db: Session = Depends(get_db)) -> Response:
     if not _get_admin_session(request):
-        return _redirect("/admin/login")
+        return _redirect(ADMIN_LOGIN_PATH)
 
     users = user_service.list_users(db)
     nodes = db.scalars(select(Node).order_by(Node.sort_order.asc())).all()
@@ -184,7 +189,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)) -> Response
     )
 
 
-@router.post("/admin/users")
+@router.post(f"{ADMIN_BASE_PATH}/users")
 def admin_create_user(
     request: Request,
     username: str = Form(...),
@@ -196,7 +201,7 @@ def admin_create_user(
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
     if not _get_admin_session(request):
-        return _redirect("/admin/login")
+        return _redirect(ADMIN_LOGIN_PATH)
     try:
         quota_bytes = None
         if total_quota_gb.strip():
@@ -220,13 +225,13 @@ def admin_create_user(
             ),
         )
         db.commit()
-        return _redirect("/admin")
+        return _redirect(ADMIN_BASE_PATH)
     except ValueError as exc:
         db.rollback()
-        return _redirect(f"/admin?error={str(exc)}")
+        return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post("/admin/users/{user_id}/limits")
+@router.post(f"{ADMIN_BASE_PATH}/users/{user_id}/limits")
 def admin_update_user_limits(
     user_id: int,
     request: Request,
@@ -236,7 +241,7 @@ def admin_update_user_limits(
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
     if not _get_admin_session(request):
-        return _redirect("/admin/login")
+        return _redirect(ADMIN_LOGIN_PATH)
     try:
         limit = int(device_limit.strip() or "5")
         quota_bytes = None
@@ -253,13 +258,13 @@ def admin_update_user_limits(
             total_quota_bytes=quota_bytes,
         )
         db.commit()
-        return _redirect("/admin")
+        return _redirect(ADMIN_BASE_PATH)
     except ValueError as exc:
         db.rollback()
-        return _redirect(f"/admin?error={str(exc)}")
+        return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post("/admin/users/{user_id}/devices")
+@router.post(f"{ADMIN_BASE_PATH}/users/{user_id}/devices")
 def admin_create_device(
     user_id: int,
     request: Request,
@@ -268,105 +273,105 @@ def admin_create_device(
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
     if not _get_admin_session(request):
-        return _redirect("/admin/login")
+        return _redirect(ADMIN_LOGIN_PATH)
     try:
         user_service.create_device(db, user_id, DeviceCreate(name=name.strip(), remark=remark.strip() or None))
         db.commit()
-        return _redirect("/admin")
+        return _redirect(ADMIN_BASE_PATH)
     except ValueError as exc:
         db.rollback()
-        return _redirect(f"/admin?error={str(exc)}")
+        return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post("/admin/users/{user_id}/toggle")
+@router.post(f"{ADMIN_BASE_PATH}/users/{user_id}/toggle")
 def admin_toggle_user(user_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
-        return _redirect("/admin/login")
+        return _redirect(ADMIN_LOGIN_PATH)
     try:
         user = user_service.get_user_by_id(db, user_id)
         user_service.set_user_status(db, user_id, not user.is_active)
         node_sync_service.sync_all_nodes(db)
         db.commit()
-        return _redirect("/admin")
+        return _redirect(ADMIN_BASE_PATH)
     except Exception as exc:
         db.rollback()
-        return _redirect(f"/admin?error={str(exc)}")
+        return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post("/admin/users/{user_id}/delete")
+@router.post(f"{ADMIN_BASE_PATH}/users/{user_id}/delete")
 def admin_delete_user(user_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
-        return _redirect("/admin/login")
+        return _redirect(ADMIN_LOGIN_PATH)
     try:
         user_service.delete_user(db, user_id)
         db.execute(delete(WebAccount).where(WebAccount.user_id == user_id))
         node_sync_service.sync_all_nodes(db)
         db.commit()
-        return _redirect("/admin")
+        return _redirect(ADMIN_BASE_PATH)
     except ValueError as exc:
         db.rollback()
-        return _redirect(f"/admin?error={str(exc)}")
+        return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post("/admin/devices/{device_id}/toggle")
+@router.post(f"{ADMIN_BASE_PATH}/devices/{device_id}/toggle")
 def admin_toggle_device(device_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
-        return _redirect("/admin/login")
+        return _redirect(ADMIN_LOGIN_PATH)
     try:
         device = user_service.get_device_by_id(db, device_id)
         user_service.set_device_status(db, device_id, not device.is_active)
         node_sync_service.sync_all_nodes(db)
         db.commit()
-        return _redirect("/admin")
+        return _redirect(ADMIN_BASE_PATH)
     except Exception as exc:
         db.rollback()
-        return _redirect(f"/admin?error={str(exc)}")
+        return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post("/admin/devices/{device_id}/delete")
+@router.post(f"{ADMIN_BASE_PATH}/devices/{device_id}/delete")
 def admin_delete_device(device_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
-        return _redirect("/admin/login")
+        return _redirect(ADMIN_LOGIN_PATH)
     try:
         device = user_service.get_device_by_id(db, device_id)
         user = user_service.get_user_by_id(db, device.user_id)
         user_service.delete_device(db, user.id, device.id)
         node_sync_service.sync_all_nodes(db)
         db.commit()
-        return _redirect("/admin")
+        return _redirect(ADMIN_BASE_PATH)
     except ValueError as exc:
         db.rollback()
-        return _redirect(f"/admin?error={str(exc)}")
+        return _redirect(f"{ADMIN_BASE_PATH}?error={str(exc)}")
 
 
-@router.post("/admin/devices/{device_id}/rotate-token")
+@router.post(f"{ADMIN_BASE_PATH}/devices/{device_id}/rotate-token")
 def admin_rotate_device_token(device_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
-        return _redirect("/admin/login")
+        return _redirect(ADMIN_LOGIN_PATH)
     device = user_service.get_device_by_id(db, device_id)
     device.subscription_token = token_urlsafe(24)
     db.commit()
-    return _redirect("/admin")
+    return _redirect(ADMIN_BASE_PATH)
 
 
-@router.post("/admin/tasks/collect-traffic")
+@router.post(f"{ADMIN_BASE_PATH}/tasks/collect-traffic")
 def admin_collect_traffic(request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
-        return _redirect("/admin/login")
+        return _redirect(ADMIN_LOGIN_PATH)
     nodes = db.scalars(select(Node).where(Node.is_active.is_(True))).all()
     for node in nodes:
         traffic_service.collect_from_node(db, node)
     db.commit()
-    return _redirect("/admin")
+    return _redirect(ADMIN_BASE_PATH)
 
 
-@router.post("/admin/tasks/sync-peers")
+@router.post(f"{ADMIN_BASE_PATH}/tasks/sync-peers")
 def admin_sync_peers(request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
-        return _redirect("/admin/login")
+        return _redirect(ADMIN_LOGIN_PATH)
     node_sync_service.sync_all_nodes(db)
     db.commit()
-    return _redirect("/admin")
+    return _redirect(ADMIN_BASE_PATH)
 
 
 @router.get("/portal/login")
@@ -585,3 +590,4 @@ def portal_home(
             "portal_error": request.query_params.get("error"),
         },
     )
+

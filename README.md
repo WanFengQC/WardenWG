@@ -9,7 +9,7 @@ WardenWG 是一个用于管理 WireGuard 节点、用户和订阅下发的服务
 - 管理后台与用户前台页面
 
 ## Endpoints
-- 管理后台：`/admin/login`
+- 管理后台：`$ADMIN_WEB_PATH/login`（默认 `/console/login`）
 - 用户登录：`/portal/login`
 - 订阅入口：`/sub/{token}/main.yaml`
 
@@ -21,6 +21,7 @@ docker compose up -d --build
 ## Environment
 请使用 `.env` 配置运行参数，常见项包括：
 - `DATABASE_URL`
+- `ADMIN_WEB_PATH`
 - `SUBSCRIPTION_BASE_URL`
 - `SSH_USERNAME` / `SSH_PASSWORD`
 - `WG_CONFIG_NAME`
