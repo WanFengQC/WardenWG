@@ -546,6 +546,21 @@ def portal_home(
             for summary, node_name in rows
         ]
 
+    device_summaries: dict[int, list[dict[str, object]]] = {}
+    for item in devices:
+        item_rows = get_device_traffic_rows(db, item.id)
+        device_summaries[item.id] = [
+            {
+                "traffic_date": summary.traffic_date,
+                "node_name": node_name,
+                "rx_bytes": summary.rx_bytes,
+                "tx_bytes": summary.tx_bytes,
+                "total_bytes": summary.total_bytes,
+                "latest_handshake_at": summary.latest_handshake_at,
+            }
+            for summary, node_name in item_rows
+        ]
+
     total_used_bytes = sum(item.used_bytes for item in devices)
     return templates.TemplateResponse(
         request,
@@ -556,6 +571,7 @@ def portal_home(
             "devices": devices,
             "show_device_detail": show_device_detail,
             "summaries": summaries,
+            "device_summaries": device_summaries,
             "total_used_bytes": total_used_bytes,
             "subscription_base_url": settings.subscription_base_url,
             "portal_error": request.query_params.get("error"),
