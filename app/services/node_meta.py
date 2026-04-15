@@ -6,7 +6,7 @@ from app.models.node import Node
 NODE_REGION_MAP: dict[str, str] = {
     "node-206": "美国",
     "node-100": "美国",
-    "node-101": "法国",
+    "node-101": "美国",
 }
 
 
