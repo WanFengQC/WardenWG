@@ -54,11 +54,21 @@
           </div>
           <div class="muted">{{ item.used_bytes|filesize }}</div>
         </div>
-        <div class="links" style="margin-top:10px;">
-          <a class="link-box mono" href="{{ subscription_base_url }}/sub/{{ item.subscription_token }}/main.yaml" target="_blank">{{ subscription_base_url }}/sub/{{ item.subscription_token }}/main.yaml</a>
-          <a class="link-box mono" href="{{ subscription_base_url }}/sub/{{ item.subscription_token }}/nodes.yaml" target="_blank">{{ subscription_base_url }}/sub/{{ item.subscription_token }}/nodes.yaml</a>
-        </div>
         <div class="inline-actions" style="margin-top:10px;">
+          <button
+            class="alt"
+            type="button"
+            onclick="copySubscription('{{ subscription_base_url }}/sub/{{ item.subscription_token }}/main.yaml', this)"
+          >
+            复制订阅链接
+          </button>
+          <button
+            class="warn"
+            type="button"
+            onclick="importToClash('{{ subscription_base_url }}/sub/{{ item.subscription_token }}/main.yaml')"
+          >
+            导入到 Clash
+          </button>
           <a class="button alt" href="/portal?device_id={{ item.id }}">查看设备</a>
           <form method="post" action="/portal/devices/{{ item.id }}/delete" onsubmit="return confirm('确认删除设备 {{ item.name }}？');">
             <button class="danger" type="submit">删除设备</button>
@@ -145,4 +155,23 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+function copySubscription(url, btn) {
+  navigator.clipboard.writeText(url).then(function () {
+    if (!btn) return;
+    var old = btn.textContent;
+    btn.textContent = "已复制";
+    setTimeout(function () { btn.textContent = old; }, 1200);
+  }).catch(function () {
+    window.prompt("复制订阅链接", url);
+  });
+}
+
+function importToClash(url) {
+  var scheme = "clash://install-config?url=" + encodeURIComponent(url);
+  window.location.href = scheme;
+}
+</script>
 {% endblock %}
