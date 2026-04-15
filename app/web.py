@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from secrets import token_urlsafe
 
 from fastapi import APIRouter, Depends, Form, Query, Request, Response, status
@@ -46,17 +46,16 @@ def _format_bytes(value: int) -> str:
     return f"{value} B"
 
 
-def _format_datetime_utc8(value: datetime | None) -> str:
+def _format_date_utc(value: datetime | None) -> str:
     if not value:
         return "-"
-    utc8 = timezone(timedelta(hours=8))
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(utc8).strftime("%Y-%m-%d %H:%M:%S")
+    return value.astimezone(timezone.utc).strftime("%Y%m%d")
 
 
 templates.env.filters["filesize"] = _format_bytes
-templates.env.filters["datetime"] = _format_datetime_utc8
+templates.env.filters["datetime"] = _format_date_utc
 templates.env.globals["node_compact_name"] = node_compact_name
 templates.env.globals["node_region"] = node_region
 templates.env.globals["node_code"] = node_code

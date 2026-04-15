@@ -16,8 +16,7 @@
     {% if show_device_detail %}
     <a class="button alt" href="/portal">返回首页</a>
     {% endif %}
-    <a class="button" href="#create-device">新建设备</a>
-    <form method="post" action="/portal/logout"><button class="danger" type="submit">退出</button></form>
+    <form method="post" action="/portal/logout"><button type="submit">退出登录</button></form>
   </div>
 </div>
 
@@ -63,7 +62,7 @@
             复制订阅链接
           </button>
           <button
-            class="warn"
+            class="import-clash"
             type="button"
             onclick="importToClash('{{ subscription_base_url }}/sub/{{ item.subscription_token }}/main.yaml')"
           >
