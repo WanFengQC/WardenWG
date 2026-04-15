@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.config import get_settings
 from app.models.device import Device
 from app.models.login_ip_block import LoginIPBlock
 from app.models.user import User
@@ -35,6 +36,15 @@ class WebAuthService:
 
     def __init__(self, user_service: UserService):
         self.user_service = user_service
+        self.settings = get_settings()
+
+    def _is_ip_whitelisted(self, ip: str) -> bool:
+        whitelist = {
+            item.strip()
+            for item in self.settings.login_ip_whitelist.split(",")
+            if item.strip()
+        }
+        return ip in whitelist
 
     def _hash_password(self, password: str) -> str:
         iterations = 100_000
@@ -64,11 +74,19 @@ class WebAuthService:
         return hmac.compare_digest(candidate, digest)
 
     def is_ip_blocked(self, db: Session, ip: str) -> bool:
+        if self._is_ip_whitelisted(ip):
+            return False
         record = db.scalar(select(LoginIPBlock).where(LoginIPBlock.ip_address == ip))
         return bool(record and record.is_blocked)
 
     def record_failed_login(self, db: Session, ip: str) -> None:
         record = db.scalar(select(LoginIPBlock).where(LoginIPBlock.ip_address == ip))
+        if self._is_ip_whitelisted(ip):
+            if record is not None:
+                record.failed_attempts = 0
+                record.is_blocked = False
+                record.updated_at = datetime.now(UTC).replace(tzinfo=None)
+            return
         now = datetime.now(UTC).replace(tzinfo=None)
         if record is None:
             record = LoginIPBlock(ip_address=ip, failed_attempts=1, is_blocked=False, updated_at=now)

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     subscription_base_url: str = "https://sub.example.com"
     subscription_display_name: str = "WFQC8"
     admin_web_path: str = "/console"
+    login_ip_whitelist: str = ""
     api_prefix: str = "/api/v1"
     admin_api_key: str = "change-me"
     wg_config_name: str = "wg0"
