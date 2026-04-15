@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}用户前台登录{% endblock %}
+{% block title %}登录{% endblock %}
 {% block content %}
 <div class="auth-wrap panel">
-  <h1>用户前台</h1>
-  <p class="muted">使用账号密码登录，查看订阅地址和流量信息。</p>
+  <h1>账号登录</h1>
+  <p class="muted">请输入用户名和密码登录。</p>
   <form method="post" action="/portal/login" class="grid">
     <label>
       <div>用户名</div>
@@ -13,7 +13,7 @@
       <div>密码</div>
       <input type="password" name="password" placeholder="输入密码" required>
     </label>
-    <button type="submit">进入前台</button>
+    <button type="submit">登录</button>
   </form>
   {% if error %}
   <div class="notice">{{ error }}</div>

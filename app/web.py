@@ -279,8 +279,8 @@ def portal_login(
         return templates.TemplateResponse(
             request,
             "portal_login.html",
-            {"error": "该 IP 登录失败次数过多，已被封禁"},
-            status_code=403,
+            {"error": "用户名或密码错误"},
+            status_code=400,
         )
 
     result = web_auth_service.authenticate_user(db, username.strip(), password)
@@ -290,7 +290,7 @@ def portal_login(
         return templates.TemplateResponse(
             request,
             "portal_login.html",
-            {"error": "用户名或密码错误，或账号不可用"},
+            {"error": "用户名或密码错误"},
             status_code=400,
         )
 
