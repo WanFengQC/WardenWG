@@ -86,41 +86,10 @@
         </td>
         <td>{{ user.used_bytes|filesize }}</td>
         <td>
-          {% for device in user.devices %}
-          <div class="panel" style="padding: 14px; margin-bottom: 10px; border-radius: 16px; box-shadow: none;">
-            <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
-              <div>
-                <strong>{{ device.name }}</strong>
-                <span class="status{% if not device.is_active %} off{% endif %}" style="margin-left:8px;">
-                  {{ "启用" if device.is_active else "禁用" }}
-                </span>
-              </div>
-              <div class="muted">{{ device.used_bytes|filesize }}</div>
-            </div>
-            <div class="mono" style="margin-top:8px;">
-              {{ subscription_base_url }}/sub/{{ device.subscription_token }}/main.yaml
-            </div>
-            <div class="mono" style="margin-top:8px;">
-              {% for peer in device.peers %}
-                {{ peer.node.name }} → {{ peer.client_address }}<br>
-              {% endfor %}
-            </div>
-            <div class="inline-actions" style="margin-top:10px;">
-              <form method="post" action="/admin/devices/{{ device.id }}/toggle">
-                <button class="alt" type="submit">{{ "禁用设备" if device.is_active else "启用设备" }}</button>
-              </form>
-              <form method="post" action="/admin/devices/{{ device.id }}/rotate-token">
-                <button class="warn" type="submit">轮换设备订阅</button>
-              </form>
-              <a class="button alt" href="/portal?token={{ device.subscription_token }}">设备前台</a>
-            </div>
+          <div class="muted">共 {{ user.devices|length }} 台设备</div>
+          <div class="inline-actions" style="margin-top:8px;">
+            <a class="button alt" href="#user-devices-{{ user.id }}">查看设备</a>
           </div>
-          {% endfor %}
-          <form method="post" action="/admin/users/{{ user.id }}/devices" class="grid" style="margin-top:12px;">
-            <input name="name" placeholder="新增设备名，例如 ipad" required>
-            <input name="remark" placeholder="设备备注，可选">
-            <button type="submit">新增设备</button>
-          </form>
         </td>
         <td>
           <div class="inline-actions">
@@ -151,6 +120,50 @@
       <label><div>到期时间</div><input type="datetime-local" name="expires_at" value="{{ user.expires_at.strftime('%Y-%m-%dT%H:%M:%S') if user.expires_at else '' }}"></label>
       <label><div>总流量配额（GB）</div><input name="total_quota_gb" value="{{ (user.total_quota_bytes / 1073741824) if user.total_quota_bytes else '' }}" placeholder="留空表示不限额"></label>
       <button type="submit">保存</button>
+    </form>
+  </div>
+</div>
+
+<div id="user-devices-{{ user.id }}" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 style="margin:0;">{{ user.username }} 设备管理</h2>
+      <a class="button alt" href="/admin">关闭</a>
+    </div>
+    {% for device in user.devices %}
+    <div class="panel" style="padding: 14px; margin-bottom: 10px; border-radius: 16px; box-shadow: none;">
+      <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+        <div>
+          <strong>{{ device.name }}</strong>
+          <span class="status{% if not device.is_active %} off{% endif %}" style="margin-left:8px;">
+            {{ "启用" if device.is_active else "禁用" }}
+          </span>
+        </div>
+        <div class="muted">{{ device.used_bytes|filesize }}</div>
+      </div>
+      <div class="mono" style="margin-top:8px;">
+        {{ subscription_base_url }}/sub/{{ device.subscription_token }}/main.yaml
+      </div>
+      <div class="mono" style="margin-top:8px;">
+        {% for peer in device.peers %}
+          {{ peer.node.name }} → {{ peer.client_address }}<br>
+        {% endfor %}
+      </div>
+      <div class="inline-actions" style="margin-top:10px;">
+        <form method="post" action="/admin/devices/{{ device.id }}/toggle">
+          <button class="alt" type="submit">{{ "禁用设备" if device.is_active else "启用设备" }}</button>
+        </form>
+        <form method="post" action="/admin/devices/{{ device.id }}/rotate-token">
+          <button class="warn" type="submit">轮换设备订阅</button>
+        </form>
+        <a class="button alt" href="/portal?token={{ device.subscription_token }}">设备前台</a>
+      </div>
+    </div>
+    {% endfor %}
+    <form method="post" action="/admin/users/{{ user.id }}/devices" class="grid" style="margin-top:12px;">
+      <input name="name" placeholder="新增设备名，例如 ipad" required>
+      <input name="remark" placeholder="设备备注，可选">
+      <button type="submit">新增设备</button>
     </form>
   </div>
 </div>
