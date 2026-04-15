@@ -22,11 +22,11 @@ proxy-providers:
     type: http
     url: {{ nodes_url }}
     path: ./providers/wardenwg-nodes-{{ device.subscription_token[:8] }}.yaml
-    interval: 3600
+    interval: 60
     health-check:
       enable: true
       url: https://cp.cloudflare.com/generate_204
-      interval: 300
+      interval: 60
 
 proxy-groups:
   - name: PROXY
@@ -40,7 +40,7 @@ proxy-groups:
     use:
       - wardenwg-nodes-{{ device.subscription_token[:8] }}
     url: https://cp.cloudflare.com/generate_204
-    interval: 300
+    interval: 60
     tolerance: 100
   - name: FINAL
     type: select
