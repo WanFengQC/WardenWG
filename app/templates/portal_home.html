@@ -88,13 +88,13 @@
     <section class="panel" style="padding:14px;">
       <h3 style="margin:0 0 10px;">节点信息</h3>
       <table>
-        <thead><tr><th>节点</th><th>地址</th><th>公钥</th></tr></thead>
+        <thead><tr><th>节点</th><th>地址</th><th>IP归属地</th></tr></thead>
         <tbody>
         {% for peer in item.peers %}
         <tr>
           <td>{{ node_compact_name(peer.node, user.username, item.name) }}</td>
           <td>{{ peer.client_address }}</td>
-          <td class="mono">{{ peer.public_key }}</td>
+          <td>{{ node_region(peer.node) }} ({{ peer.node.public_ip }})</td>
         </tr>
         {% endfor %}
         </tbody>
