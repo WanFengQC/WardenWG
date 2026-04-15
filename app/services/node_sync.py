@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.models.device import Device
 from app.models.node import Node
 from app.models.peer import Peer
 from app.models.user import User
@@ -45,7 +46,9 @@ class NodeSyncService:
             db.query(Peer)
             .filter(Peer.node_id == node.id)
             .join(User, User.id == Peer.user_id)
+            .join(Device, Device.id == Peer.device_id)
             .filter(User.is_active.is_(True))
+            .filter(Device.is_active.is_(True))
             .all()
         )
         config_snippet = self.render_full_config(peers)
@@ -78,4 +81,3 @@ class NodeSyncService:
     def sync_all_nodes(self, db: Session) -> list[SyncResult]:
         nodes = db.query(Node).filter(Node.is_active.is_(True)).order_by(Node.sort_order).all()
         return [self.sync_node(db, node) for node in nodes]
-

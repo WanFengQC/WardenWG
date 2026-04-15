@@ -261,10 +261,15 @@ def admin_create_device(
 def admin_toggle_user(user_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
         return _redirect("/admin/login")
-    user = user_service.get_user_by_id(db, user_id)
-    user_service.set_user_status(db, user_id, not user.is_active)
-    db.commit()
-    return _redirect("/admin")
+    try:
+        user = user_service.get_user_by_id(db, user_id)
+        user_service.set_user_status(db, user_id, not user.is_active)
+        node_sync_service.sync_all_nodes(db)
+        db.commit()
+        return _redirect("/admin")
+    except Exception as exc:
+        db.rollback()
+        return _redirect(f"/admin?error={str(exc)}")
 
 
 @router.post("/admin/users/{user_id}/delete")
@@ -274,6 +279,7 @@ def admin_delete_user(user_id: int, request: Request, db: Session = Depends(get_
     try:
         user_service.delete_user(db, user_id)
         db.execute(delete(WebAccount).where(WebAccount.user_id == user_id))
+        node_sync_service.sync_all_nodes(db)
         db.commit()
         return _redirect("/admin")
     except ValueError as exc:
@@ -285,10 +291,15 @@ def admin_delete_user(user_id: int, request: Request, db: Session = Depends(get_
 def admin_toggle_device(device_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
         return _redirect("/admin/login")
-    device = user_service.get_device_by_id(db, device_id)
-    user_service.set_device_status(db, device_id, not device.is_active)
-    db.commit()
-    return _redirect("/admin")
+    try:
+        device = user_service.get_device_by_id(db, device_id)
+        user_service.set_device_status(db, device_id, not device.is_active)
+        node_sync_service.sync_all_nodes(db)
+        db.commit()
+        return _redirect("/admin")
+    except Exception as exc:
+        db.rollback()
+        return _redirect(f"/admin?error={str(exc)}")
 
 
 @router.post("/admin/devices/{device_id}/delete")
@@ -301,6 +312,7 @@ def admin_delete_device(device_id: int, request: Request, db: Session = Depends(
         if len(user.devices) <= 1:
             return _redirect("/admin?error=至少保留一台设备")
         user_service.delete_device(db, user.id, device.id)
+        node_sync_service.sync_all_nodes(db)
         db.commit()
         return _redirect("/admin")
     except ValueError as exc:
@@ -438,6 +450,7 @@ def portal_delete_device(
             return _redirect("/portal?error=设备不存在")
         deleting_session_device = seed_device.id == target.id
         user_service.delete_device(db, user.id, target.id)
+        node_sync_service.sync_all_nodes(db)
         db.commit()
 
         if deleting_session_device:
