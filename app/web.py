@@ -54,8 +54,17 @@ def _format_date_utc(value: datetime | None) -> str:
     return value.astimezone(timezone.utc).strftime("%Y%m%d")
 
 
+def _format_datetime_seconds_utc(value: datetime | None) -> str:
+    if not value:
+        return "-"
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
 templates.env.filters["filesize"] = _format_bytes
 templates.env.filters["datetime"] = _format_date_utc
+templates.env.filters["datetime_seconds"] = _format_datetime_seconds_utc
 templates.env.globals["node_compact_name"] = node_compact_name
 templates.env.globals["node_region"] = node_region
 templates.env.globals["node_code"] = node_code

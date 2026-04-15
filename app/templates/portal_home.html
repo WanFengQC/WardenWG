@@ -103,23 +103,24 @@
 
     <section class="panel" style="padding:14px; margin-top:12px;">
       <h3 style="margin:0 0 10px;">流量明细</h3>
-      <table>
-        <thead><tr><th>日期(UTC)</th><th>节点</th><th>下行</th><th>上行</th><th>合计</th><th>最近握手(UTC)</th></tr></thead>
-        <tbody>
-        {% for row in device_summaries.get(item.id, []) %}
-        <tr>
-          <td>{{ row.traffic_date }}</td>
-          <td>{{ row.node_name }}</td>
-          <td>{{ row.rx_bytes|filesize }}</td>
-          <td>{{ row.tx_bytes|filesize }}</td>
-          <td>{{ row.total_bytes|filesize }}</td>
-          <td>{{ row.latest_handshake_at|datetime }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6" class="muted">暂无流量记录</td></tr>
-        {% endfor %}
-        </tbody>
-      </table>
+      <div class="table-scroll">
+        <table class="traffic-table">
+          <thead><tr><th>日期(UTC)</th><th>节点</th><th>下行</th><th>上行</th><th>合计</th></tr></thead>
+          <tbody>
+          {% for row in device_summaries.get(item.id, []) %}
+          <tr>
+            <td>{{ row.latest_handshake_at|datetime_seconds if row.latest_handshake_at else row.traffic_date }}</td>
+            <td>{{ row.node_name }}</td>
+            <td>{{ row.rx_bytes|filesize }}</td>
+            <td>{{ row.tx_bytes|filesize }}</td>
+            <td>{{ row.total_bytes|filesize }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="muted">暂无流量记录</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </section>
   </div>
 </div>
