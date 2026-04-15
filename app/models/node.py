@@ -14,7 +14,7 @@ class Node(Base):
     display_name: Mapped[str] = mapped_column(String(128))
     public_ip: Mapped[str] = mapped_column(String(64), unique=True)
     private_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    ssh_port: Mapped[int] = mapped_column(default=5522)
+    ssh_port: Mapped[int] = mapped_column(default=22)
     ssh_host: Mapped[str] = mapped_column(String(128))
     wg_endpoint_host: Mapped[str] = mapped_column(String(128))
     wg_port: Mapped[int] = mapped_column(Integer)
@@ -31,4 +31,3 @@ class Node(Base):
     )
 
     peers = relationship("Peer", back_populates="node", cascade="all, delete-orphan")
-

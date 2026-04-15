@@ -49,7 +49,7 @@ def _build_subscription_headers(device, filename: str) -> dict[str, str]:
     download = sum(peer.transfer_rx_total for peer in device.peers)
     total = device.user.total_quota_bytes if device.user.total_quota_bytes is not None else download + upload
     expire = int(device.user.expires_at.timestamp()) if device.user.expires_at else 0
-    display_name = settings.subscription_display_name.strip() or "WFQC8"
+    display_name = settings.subscription_display_name.strip() or "WardenWG"
     encoded_filename = quote(filename)
     return {
         "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
@@ -72,7 +72,7 @@ def get_main_yaml(
     device = _load_subscription_user(db, token)
     body = subscription_service.build_main_yaml(device)
     _write_access_log(db, device.user_id, token, "main.yaml", request, user_agent)
-    filename = settings.subscription_display_name or "WFQC8"
+    filename = settings.subscription_display_name or "WardenWG"
     return Response(
         content=body,
         media_type="text/yaml; charset=utf-8",
@@ -90,7 +90,7 @@ def get_nodes_yaml(
     device = _load_subscription_user(db, token)
     body = subscription_service.build_nodes_yaml(device)
     _write_access_log(db, device.user_id, token, "nodes.yaml", request, user_agent)
-    filename = f"{settings.subscription_display_name or 'WFQC8'}-nodes"
+    filename = f"{settings.subscription_display_name or 'WardenWG'}-nodes"
     return Response(
         content=body,
         media_type="text/yaml; charset=utf-8",
