@@ -156,11 +156,9 @@
         <form method="post" action="/admin/devices/{{ device.id }}/rotate-token">
           <button class="warn" type="submit">轮换设备订阅</button>
         </form>
-        {% if user.devices|length > 1 %}
         <form method="post" action="/admin/devices/{{ device.id }}/delete" onsubmit="return confirm('确认删除设备 {{ device.name }}？');">
           <button class="danger" type="submit">删除设备</button>
         </form>
-        {% endif %}
         <a class="button alt" href="/portal?token={{ device.subscription_token }}">设备前台</a>
       </div>
     </div>

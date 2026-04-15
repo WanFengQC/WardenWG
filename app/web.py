@@ -309,8 +309,6 @@ def admin_delete_device(device_id: int, request: Request, db: Session = Depends(
     try:
         device = user_service.get_device_by_id(db, device_id)
         user = user_service.get_user_by_id(db, device.user_id)
-        if len(user.devices) <= 1:
-            return _redirect("/admin?error=至少保留一台设备")
         user_service.delete_device(db, user.id, device.id)
         node_sync_service.sync_all_nodes(db)
         db.commit()
@@ -443,8 +441,6 @@ def portal_delete_device(
         seed_device = user_service.get_device_by_token(db, session_subject)
         user_service.validate_device_subscription(seed_device)
         user = user_service.get_user_by_id(db, seed_device.user_id)
-        if len(user.devices) <= 1:
-            return _redirect("/portal?error=至少保留一台设备")
         target = next((item for item in user.devices if item.id == device_id), None)
         if target is None:
             return _redirect("/portal?error=设备不存在")
