@@ -291,6 +291,23 @@ def admin_toggle_device(device_id: int, request: Request, db: Session = Depends(
     return _redirect("/admin")
 
 
+@router.post("/admin/devices/{device_id}/delete")
+def admin_delete_device(device_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
+    if not _get_admin_session(request):
+        return _redirect("/admin/login")
+    try:
+        device = user_service.get_device_by_id(db, device_id)
+        user = user_service.get_user_by_id(db, device.user_id)
+        if len(user.devices) <= 1:
+            return _redirect("/admin?error=至少保留一台设备")
+        user_service.delete_device(db, user.id, device.id)
+        db.commit()
+        return _redirect("/admin")
+    except ValueError as exc:
+        db.rollback()
+        return _redirect(f"/admin?error={str(exc)}")
+
+
 @router.post("/admin/devices/{device_id}/rotate-token")
 def admin_rotate_device_token(device_id: int, request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
     if not _get_admin_session(request):
