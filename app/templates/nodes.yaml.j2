@@ -4,6 +4,19 @@ proxies:
     type: wireguard
     ip: {{ peer.client_address }}
     private-key: {{ peer.private_key }}
+{% set awg = amnezia_option_for_node(peer.node) %}
+{% if awg %}
+    amnezia-wg-option:
+      jc: {{ awg.jc }}
+      jmin: {{ awg.jmin }}
+      jmax: {{ awg.jmax }}
+      s1: {{ awg.s1 }}
+      s2: {{ awg.s2 }}
+      h1: "{{ awg.h1 }}"
+      h2: "{{ awg.h2 }}"
+      h3: "{{ awg.h3 }}"
+      h4: "{{ awg.h4 }}"
+{% endif %}
     udp: true
     mtu: {{ wg_interface_mtu }}
     persistent-keepalive: {{ wg_persistent_keepalive }}

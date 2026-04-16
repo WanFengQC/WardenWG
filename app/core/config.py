@@ -18,6 +18,16 @@ class Settings(BaseSettings):
     subscription_display_name: str = "WFQC8"
     admin_web_path: str = "/console"
     login_ip_whitelist: str = ""
+    amnezia_nodes: str = ""
+    amnezia_jc: int = 3
+    amnezia_jmin: int = 40
+    amnezia_jmax: int = 70
+    amnezia_s1: int = 0
+    amnezia_s2: int = 0
+    amnezia_h1: str = "1"
+    amnezia_h2: str = "2"
+    amnezia_h3: str = "3"
+    amnezia_h4: str = "4"
     api_prefix: str = "/api/v1"
     admin_api_key: str = "change-me"
     wg_config_name: str = "wg0"
